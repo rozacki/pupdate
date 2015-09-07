@@ -73,7 +73,7 @@ func loadConfiguration(configurationFileName string) *TaskConfiguration {
 	}
 	decoder := json.NewDecoder(file)
 	configuration := TaskConfiguration{}
-	configuration.Method = TaskMethod_SQLUpdate
+
 	if err := decoder.Decode(&configuration); err != nil {
 		panic(err)
 	}

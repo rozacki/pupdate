@@ -15,14 +15,13 @@ const (
 	TestConfigurationFolder    = "test_configs"
 )
 
-//todo: load and tun all configurations from /test folder
+//todo: load and run all configurations from /test folder
 func TestStartTask(T *testing.T) {
 
 	configs, err := filepath.Glob(path.Join(TestConfigurationFolder, "*"))
 	if err != nil {
 		T.Fatal(err.Error())
 	}
-	//todo: test all configurations from tests folders
 	for _, configFileName := range configs {
 		configuration := loadConfiguration(configFileName)
 		if configuration == nil {
