@@ -48,18 +48,16 @@ func main() {
 		fmt.Println("configuration load error")
 		os.Exit(1)
 	}
-	//is there is any task to do
-	if len(configuration.Tasks)==0{
-		fmt.Println("no tasks scheduled. exit")
+
+
+	fmt.Printf("Configuration loaded. Found %d tasks", len(configuration.Tasks))
+
+	var sessionController 	SessionController
+	//start new session
+	if sessionController:=	makeSession(configuration);sessionController==nil{
 		os.Exit(1)
 	}
-
-	fmt.Printf("Configuration loaded\n")
-	var jobDataChannel = make(chan *JobData, configuration.Tasks[0].Concurrency)
-	var JobController = JobController{JobDataChannel: jobDataChannel}
-	var taskId uint64 = 0
-
-	JobController.StartTask(taskId, &configuration.Tasks[0])
+	sessionController.StartTask(&configuration.Tasks[0])
 
 	var key string
 	fmt.Scanf("%s", &key)
@@ -94,7 +92,6 @@ func setLogOutput() {
 	log.SetOutput(f)
 }
 
-
 func SerialiseStruct(v interface{}) {
 	defer func() {
 		//swallow issue anc carry on
@@ -107,50 +104,3 @@ func SerialiseStruct(v interface{}) {
 	ioutil.WriteFile(DefaultStatusFileName, bytes, 0644)
 }
 
-//tested on MySQL updated
-func (this *JobController) SQLUpdate(jobData *JobData, dsn string, sessionParams string, query string) {
-	//store start time
-	jobData.StartTime = time.Now()
-	defer func() {
-		if err := recover(); err != nil {
-			//log.Println(err)
-			jobData.Error = true
-			//jobData.ErrorMsg=err.Error()
-		}
-		//increase number of attmpts
-		jobData.Attempts++
-		//record data
-		jobData.StopTime = time.Now()
-		//notify producer that another job has finished
-		this.JobDataChannel <- jobData
-	}()
-
-	//fmt.Printf("start: job_id=%d, start_id=%d stop_id=%d\n",jobId, startid, limit)
-
-	//how to use connection pool?
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-	//log.Print("connection open ", Dsn)
-
-	if len(sessionParams) > 0 {
-		_, err = db.Exec(sessionParams)
-	}
-
-	if err != nil {
-		panic(err)
-	}
-
-	//all data source details should be well encapsulated
-	_, err = db.Exec(query)
-
-	//log.Print("query finished:", query)
-
-	if err != nil {
-		panic(err)
-	}
-
-	//fmt.Printf("end: job_id=%d,start_id=%d stop_id=%d\n",jobId, startid, limit)
-}

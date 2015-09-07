@@ -5,14 +5,40 @@ import(
 	"time"
 )
 
-type JobController struct {
+type SessionController struct {
+	SessionID	string
 	JobDataChannel chan (*JobData)
+	TaskCounter	uint64
+	Configuration SessionConfiguration
 }
 
+func makeSession(configuration SessionConfiguration)(session* SessionController){
+	//is there  any task to schedul?
+	if len(configuration.Tasks)==0{
+		fmt.Println("no tasks to schedule, stop")
+		return nil
+	}
+
+	var sessionController=	SessionController{SessionID:time.Now().Format(time.UnixDate),Configuration:configuration}
+	sessionController.JobDataChannel=make(chan *JobData, configuration.Tasks[0].Concurrency)
+	return &sessionController
+}
+
+//Runs job in order
+func (this *SessionController) StartTasks(configuration *TaskConfiguration) {
+	for task:=range this.Configuration.Tasks{
+		taskData:=this.startTask(task)
+		if taskData.Success==false{
+			fmt.Printf("task failed:%n",)
+		}
+	}
+}
 //
-func (this *JobController) StartTask(taskid uint64, configuration *TaskConfiguration) TaskData {
+func (this *SessionController) startTask(configuration *TaskConfiguration) TaskData {
+	//
+	this.TaskCounter++
 	//create new task data structure where we hold op data and configuration
-	var taskData 			= TaskData{Id: taskid, DataCursor: configuration.Min, Status: "working", TaskConfiguration: *configuration}
+	var taskData 			= 	TaskData{Id: this.TaskCounter, DataCursor: configuration.Min, Status: "working", TaskConfiguration: *configuration}
 	var NoJobs				=	((configuration.Max - configuration.Min)/configuration.Step)
 
 	if configuration.Debug {
@@ -93,3 +119,53 @@ func (this *JobController) StartTask(taskid uint64, configuration *TaskConfigura
 		}
 	}
 }
+
+
+//tested on MySQL updated
+func (this *SessionController) SQLUpdate(jobData *JobData, dsn string, sessionParams string, query string) {
+	//store start time
+	jobData.StartTime = time.Now()
+	defer func() {
+		if err := recover(); err != nil {
+			//log.Println(err)
+			jobData.Error = true
+			//jobData.ErrorMsg=err.Error()
+		}
+		//increase number of attmpts
+		jobData.Attempts++
+		//record data
+		jobData.StopTime = time.Now()
+		//notify producer that another job has finished
+		this.JobDataChannel <- jobData
+	}()
+
+	//fmt.Printf("start: job_id=%d, start_id=%d stop_id=%d\n",jobId, startid, limit)
+
+	//how to use connection pool?
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+	//log.Print("connection open ", Dsn)
+
+	if len(sessionParams) > 0 {
+		_, err = db.Exec(sessionParams)
+	}
+
+	if err != nil {
+		panic(err)
+	}
+
+	//all data source details should be well encapsulated
+	_, err = db.Exec(query)
+
+	//log.Print("query finished:", query)
+
+	if err != nil {
+		panic(err)
+	}
+
+	//fmt.Printf("end: job_id=%d,start_id=%d stop_id=%d\n",jobId, startid, limit)
+}
+

@@ -34,7 +34,7 @@ func TestStartTask(T *testing.T) {
 
 		fmt.Printf("Configuration loaded: %s from file %s\n", configuration.Name,configFileName)
 		var jobDataChannel = make(chan *JobData, configuration.Concurrency)
-		var JobController = JobController{JobDataChannel: jobDataChannel}
+		var JobController = SessionController{JobDataChannel: jobDataChannel}
 		var taskId uint64 = 0
 
 		//test in serial
@@ -69,7 +69,7 @@ func VerifyTestOutcome(T *testing.T, taskData TaskData, configuration TaskConfig
 //mock up simplest etst update
 //succsefull and unsucsesfull jobs
 //todo: time based
-func (this *JobController) TestUpdate(jobData *JobData, dsn string, sessionParams string, query string) {
+func (this *SessionController) TestUpdate(jobData *JobData, dsn string, sessionParams string, query string) {
 	//succsefull and unsacsesfull jobs
 	jobData.StartTime = time.Now()
 	defer func() {
