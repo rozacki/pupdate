@@ -39,7 +39,7 @@ func main() {
 
 	if len(*configFileName) == 0 {
 		fmt.Print(*configFileName)
-		fmt.Println("missing configuration (config parameter) file path")
+		fmt.Println("missing configuration (-config parameter) file path")
 		os.Exit(1)
 	}
 
@@ -48,37 +48,41 @@ func main() {
 		fmt.Println("configuration load error")
 		os.Exit(1)
 	}
+	//is there is any task to do
+	if len(configuration.Tasks)==0{
+		fmt.Println("no tasks scheduled. exit")
+		os.Exit(1)
+	}
 
-	fmt.Printf("Configuration loaded: %s\n", configuration.Name)
-	var jobDataChannel = make(chan *JobData, configuration.Concurrency)
+	fmt.Printf("Configuration loaded\n")
+	var jobDataChannel = make(chan *JobData, configuration.Tasks[0].Concurrency)
 	var JobController = JobController{JobDataChannel: jobDataChannel}
 	var taskId uint64 = 0
 
-	JobController.StartTask(taskId, configuration)
+	JobController.StartTask(taskId, &configuration.Tasks[0])
 
 	var key string
 	fmt.Scanf("%s", &key)
 }
 
 //
-func loadConfiguration(configurationFileName string) *TaskConfiguration {
+func loadConfiguration(configurationFileName string) (configuration*SessionConfiguration) {
 	defer func() {
 		if err := recover(); err != nil {
 			fmt.Println(err)
 		}
 	}()
-	file, err := os.Open(configurationFileName)
+
+	file,err:=ioutil.ReadFile(configurationFileName)
 	if err != nil {
 		panic(err)
 	}
-	decoder := json.NewDecoder(file)
-	configuration := TaskConfiguration{}
 
-	if err := decoder.Decode(&configuration); err != nil {
+	if err := json.Unmarshal(file,&configuration); err != nil {
 		panic(err)
 	}
 
-	return &configuration
+	return configuration
 }
 
 func setLogOutput() {
