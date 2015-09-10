@@ -1,0 +1,10 @@
+{
+"-SessionParam":  "set session group_concat_max_len=100000",
+"Dsn":  "moth:pass@tcp(localhost:32768)/moth",
+"Update": "update testresult as thist left join mot_v195_rel4.mot_test tm on thist.id=tm.id set thist.pass=tm.status_id where thist.id>%d and thist.id<=%d;",
+"Max": 361731616,
+"-Max": 1,
+"Min": 0,
+"Step": 100000,
+"Concurrency": 1
+}

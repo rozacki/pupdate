@@ -1,0 +1,12 @@
+{
+  "Name":"updates rasonForFailure and adisorNotice",
+  "Description":"updates reasonForFailure by concatenating multiple rows and selectining ony these woes that are fail or not fail (advice)",
+  "SessionParam":  "set session group_concat_max_len=100000",
+  "Dsn":  "moth:pass@tcp(localhost:3306)/mot_v195_rel4",
+  "Update": "update moth.testresult as t set t.reasonForFailure=ifnull((SELECT group_concat(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(COALESCE(map.location_lateral,''), ' ', COALESCE(map.location_longitudinal,''))),' ',COALESCE(map.location_vertical,''))),' ',COALESCE(timap.description, ''))),' ', COALESCE(rfrl.name,''))),' ', COALESCE(map.`comment` ,''))),CASE WHEN rfr.inspection_manual_reference IS NOT NULL THEN CONCAT( ' (', rfr.inspection_manual_reference, ')') ELSE ' ' END)) SEPARATOR ',\n') reason_for_refusal FROM mot_test_rfr_map map left JOIN language_type l ON l.code='EN' LEFT OUTER JOIN reason_for_rejection rfr ON map.rfr_id=rfr.id LEFT OUTER JOIN rfr_language_content_map rfrl ON rfrl.rfr_id=rfr.id AND rfrl.language_type_id = l.id LEFT OUTER JOIN test_item_category ti ON rfr.test_item_category_id=ti.id LEFT OUTER JOIN ti_category_language_content_map timap ON timap.test_item_category_id = rfr.test_item_category_id AND timap.language_lookup_id = l.id where t.id=map.mot_test_id and map.type in ('FAIL')),''),t.advisoryNotice=ifnull((SELECT group_concat(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(COALESCE(map.location_lateral,''), ' ', COALESCE(map.location_longitudinal,''))),' ',COALESCE(map.location_vertical,''))),' ',COALESCE(timap.description, ''))),' ', COALESCE(rfrl.name,''))),' ', COALESCE(map.`comment` ,''))),CASE WHEN rfr.inspection_manual_reference IS NOT NULL THEN CONCAT( ' (', rfr.inspection_manual_reference, ')') ELSE ' ' END)) SEPARATOR',\n') reason_for_refusal FROM mot_test_rfr_map map left JOIN language_type l ON l.code='EN' LEFT OUTER JOIN reason_for_rejection rfr ON map.rfr_id=rfr.id LEFT OUTER JOIN rfr_language_content_map rfrl ON rfrl.rfr_id=rfr.id AND rfrl.language_type_id = l.id LEFT OUTER JOIN test_item_category ti ON rfr.test_item_category_id=ti.id LEFT OUTER JOIN ti_category_language_content_map timap ON timap.test_item_category_id = rfr.test_item_category_id AND timap.language_lookup_id = l.id where t.id=map.mot_test_id and map.type not in ('FAIL')),'') where t.id>%d and t.id<=%d;",
+  "Max": 760000000,
+  "Min": 0,
+  "Step": 1000,
+  "Concurrency": 100,
+  "Debug":false
+}

@@ -1,0 +1,12 @@
+{
+  "Name":"",
+  "Description":"updates pass, version, vtX0Reference which must not be null",
+  "-SessionParam":  "set session group_concat_max_len=100000",
+  "Dsn":  "moth:pass@tcp(localhost:3306)/moth",
+  "Update": "update testresult thist inner join mot_v195_rel4.mot_test tm on thist.id=tm.id set thist.version=tm.version,thist.pass=tm.status_id, thist.vt20Reference=case when tm.status_id=6 then tm.number else '' end, thist.vt30Reference=case when tm.status_id=5 then tm.number else '' end where thist.id>%d and thist.id<=%d;",
+  "Max": 759516145,
+  "-Max": 1,
+  "Min": 360000000,
+  "Step": 1000,
+  "Concurrency": 150
+}

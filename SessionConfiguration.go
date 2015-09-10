@@ -15,9 +15,9 @@ type SessionConfiguration struct{
 }
 
 func (this *SessionConfiguration) StartSession()(*MonitoringError){
-	return Monitoring.Event(this.SessionID,"","",StartSession,this)
+	return Monitoring.Event(this.SessionID,"",0,0,StartSession,this)
 }
 
 func (this *SessionConfiguration) StopSession()(*MonitoringError){
-	return Monitoring.Event(this.SessionID,"","",StopSession,this)
+	return Monitoring.Event(this.SessionID,"",0,0,StopSession,this)
 }

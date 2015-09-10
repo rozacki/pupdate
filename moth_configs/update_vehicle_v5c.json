@@ -1,0 +1,8 @@
+{
+  "Dsn": "moth:pass@tcp(localhost:3306)/moth",
+  "Update": "update moth.vehicle v left join mot_v195_rel4.vehicle_v5c v5c on v.id = v5c.vehicle_id and v5c.last_seen is null set v.v5cReference=v5c.v5c_ref where v.id>=%d and v.id<%d;",
+  "Max": 97958093,
+  "Min": 0,
+  "Step": 256,
+  "Concurrency": 100
+}

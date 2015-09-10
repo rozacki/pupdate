@@ -8,7 +8,7 @@ type TaskConfiguration struct {
 
 	Name   string
 	Dsn    string
-	Update string
+	Exec   string
 	//it will be first parameter in the query
 	//todo: add special value (string) to indicate that all rows. staring from MIN should be transferred
 	Max uint64
@@ -30,13 +30,17 @@ type TaskConfiguration struct {
 	//current session id
 	SessionId string
 	//current task Id
-	TaskId string
+	TaskId uint64
 }
 //TaskConfiguration extands existing MonitoringModule
 func (this* TaskConfiguration) EventStartTask()(*MonitoringError){
-	return Monitoring.Event(this.SessionId,this.TaskId,"",StartSession,this)
+	return Monitoring.Event(this.SessionId,this.Name,this.TaskId,0,StartTask,this)
 }
 
 func (this* TaskConfiguration) EventStopTask()(*MonitoringError){
-	return Monitoring.Event(this.SessionId,this.TaskId,"",StopTask,this)
+	return Monitoring.Event(this.SessionId,this.Name,this.TaskId,0,StopTask,this)
+}
+
+func (this* TaskConfiguration) Event(data interface{})(*MonitoringError){
+	return Monitoring.Event(this.SessionId,this.Name,this.TaskId,0,Event,this)
 }

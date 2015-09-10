@@ -68,7 +68,8 @@ func main() {
 	go sessionController.StartTasks()
 
 	var key string
-	fmt.Scanf("Press key if you want to finish %s",&key)
+	fmt.Println("Press key if you want to finish")
+	fmt.Scanf("%s",&key)
 	close(configuration.Done)
 }
 

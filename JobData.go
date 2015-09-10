@@ -13,8 +13,6 @@ type JobData struct {
 	Error     bool
 	ErrorMsg  string
 	Attempts  uint64
-	//parrtition begining
-	PartStart uint64
-	//partition end
-	PartEnd uint64
+	//
+	Query string
 }

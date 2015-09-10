@@ -1,0 +1,26 @@
+{
+  "Monitoring":{
+    "Dsn":"root:root@tcp(dockerhost:32768)/MOT2_2"
+  },
+  "Notifications":{
+    "Email":"chris.rozacki@valtech.co.uk"
+  },
+  "Tasks":[{
+    "Name": "new makes",
+    "Description":"creates new vehicle in moth.vehicle database if does not exist in moth",
+    "SessionParam": "",
+    "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+    "Exec": "insert into MOTH3.vehiclemanufacturer (id, name) select make.id, make.name from make left outer join MOTH3.vehiclemanufacturer on make.id=MOTH3.vehiclemanufacturer.id where MOTH3.vehiclemanufacturer.id is NULL;",
+    "MaxAttempts": 3,
+    "Debug":true
+  },
+    {
+      "Name": "update existing makes",
+      "Description":"updates all existsing based on id makes regardless of last_updated_on",
+      "SessionParam": "",
+      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+      "Exec": "update MOTH3.vehiclemanufacturer mm left join make m on mm.id=m.id set mm.name=m.name where m.last_updated_on;",
+      "MaxAttempts": 3,
+      "Debug":false
+    }]
+}

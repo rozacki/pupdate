@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"encoding/json"
 )
 
 const(
@@ -10,6 +9,7 @@ const(
 	StartTask ="new_task"
 	StopSession="stop_session"
 	StopTask="stop_task"
+	Event="event"
 )
 
 //Monitoring module
@@ -50,9 +50,19 @@ func (this*MonitoringModule) record(msg string)(err error){
 	return nil
 }
 
-func (this*MonitoringModule) Event(sid string,tid string,jid string,event string,data interface{})(*MonitoringError){
-	b,_:=json.Marshal(data)
-	fmt.Printf("***%s %s %s %s %s\n",sid,tid,jid,event,string(b))
+func (this*MonitoringModule) Event(sid string,taskName string,tid uint64,jid uint64,event string,data interface{})(*MonitoringError){
+	Event:=struct{
+		Ev string
+		SID string
+		TaskName string
+		TID uint64
+		JID uint64
+		Data interface{}
+	}{
+		event,sid ,taskName ,tid ,jid,data,
+	}
+	//fmt.Printf("Event: %s %s %d %d %s %#v\n",sid,taskName,tid,jid,event,data)
+	fmt.Printf("%+v\n",Event)
 	return nil
 }
 
@@ -71,5 +81,5 @@ func makeMonitoring(configuration MonitoringConfiguration)(Monitor){
 //specific interface for monitoring tasks
 type Monitor interface{
 	//generic method
-	Event(sid string,tid string,jid string,event string,data interface{})(*MonitoringError)
+	Event(sid string,taskName string,tid uint64,jid uint64,event string,data interface{})(*MonitoringError)
 }

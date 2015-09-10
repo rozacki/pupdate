@@ -32,11 +32,14 @@ func (this *SessionController) StartTasks() {
 	for _,task:=range this.Configuration.Tasks{
 		//
 		this.Configuration.TaskCounter++
+		//
+		task.SessionId	=	this.Configuration.SessionID
 		//synchronous task
 		this.startTask(task,this.Configuration.Done)
 		//
 		//Monitoring
 		//todo:check success
+		//if sucess then store task.CreationTime and flag success
 		/*
 		if taskData.Success==false{
 			fmt.Printf("task failed:%n",)
@@ -48,6 +51,7 @@ func (this *SessionController) StartTasks() {
 		case <-this.Configuration.Done:
 			fmt.Printf("task exiting\n")
 			return
+		case  <-time.After(1* time.Millisecond):
 		}
 	}
 	this.Configuration.StopSession()
@@ -56,19 +60,25 @@ func (this *SessionController) StartTasks() {
 //todo: cancellation via done channel
 //todo: move to taskcontroller
 func (this *SessionController) startTask(configuration TaskConfiguration, done <-chan struct{}) TaskData {
-	//todo:pass context interfaces via configuration
 	configuration.EventStartTask()
 	defer func(){
 		configuration.EventStopTask()
 	}()
 	//create new task data structure where we hold op data and configuration
-	var taskData 			= 	TaskData{Id: this.Configuration.TaskCounter, DataCursor: configuration.Min, Status: "working", TaskConfiguration: configuration}
-	var JobsCount 			=	((configuration.Max - configuration.Min)/configuration.Step)
+	var taskData 			= 	TaskData{Id: this.Configuration.TaskCounter, DataCursor: configuration.Min, Status: "working", TaskConfiguration: configuration,CreationTime:time.Now()}
+	var JobsCount	uint64
+	if configuration.Step<=0 || configuration.Max<=configuration.Min || configuration.Concurrency<1{
+		JobsCount					=1
+		configuration.Step			=0
+		configuration.Max			=0
+		configuration.Min			=0
+		configuration.Concurrency	=1
+	}else {
+		JobsCount	= ((configuration.Max - configuration.Min)/configuration.Step)
+	}
 	var jobDataChannel		=	make(chan *JobData, configuration.Concurrency)
 
-	if configuration.Debug {
-		fmt.Printf("%+v\n", configuration)
-	}
+	ShowDebuginfo(configuration.Debug, configuration)
 
 	for {
 		var jobData *JobData
@@ -77,9 +87,7 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 			{
 				//check status, if it error then scheduled it again
 				if jobData.Error {
-					if configuration.Debug {
-						fmt.Printf("%+v\n", jobData)
-					}
+					ShowDebuginfo(configuration.Debug,jobData)
 					//reset flag and try again
 					jobData.Error = false
 					//increment errors counter
@@ -107,20 +115,34 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 		// or exhausted stream
 		// or finished
 		// then we cannot schedule more jobs
-		if taskData.QueueLength < configuration.Concurrency&& (taskData.Success+taskData.MaxAttemptJobsDropped+taskData.QueueLength) < JobsCount {
+		if (taskData.QueueLength < configuration.Concurrency	&&	((taskData.Success+taskData.MaxAttemptJobsDropped+taskData.QueueLength) < JobsCount)){
 
 			//if current job is empty then we create new job
 			if jobData == nil {
+				var Query string	=	configuration.Exec
+				//if partitioning enabled
+				if JobsCount>1{
+					Query=fmt.Sprintf(configuration.Exec, taskData.DataCursor, taskData.DataCursor + taskData.TaskConfiguration.Step)
+				}
 				//store only data that is requred and specifc for job
-				jobData = &JobData{Id: taskData.JobId, PartStart: taskData.DataCursor, PartEnd: taskData.DataCursor + taskData.TaskConfiguration.Step}
+				jobData = &JobData{Id: taskData.JobId, Query: Query}
 				//move cursor to the next step
 				taskData.DataCursor += configuration.Step
 				//
 				taskData.JobId++
 			}
-			//todo: switch case here
+
+			configuration.Event("I'm here")
+
+			jobContext:=	JobContext{JobData:jobData,
+				Dsn:configuration.Dsn,
+				SessionParams:configuration.SessionParam,
+				JobDataChannel:jobDataChannel,
+				Debug:configuration.Debug}
+			ShowDebuginfo(configuration.Debug,jobContext)
 			//schedule the job
-			go this.SQLUpdate( JobContext{JobData:jobData,Dsn:configuration.Dsn,SessionParams:configuration.SessionParam,Query:fmt.Sprintf(configuration.Update, jobData.PartStart, jobData.PartEnd),JobDataChannel:jobDataChannel})
+			//todo: switch case here: Exec, Query, QueryOne
+			go this.Exec(jobContext)
 			//increase queue length
 			taskData.QueueLength++
 			//reset timeout
@@ -150,9 +172,15 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 	}
 }
 
-///Atomic SQL update.
-//tested on MySQL updated
-func (this *SessionController) SQLUpdate(jobContext JobContext) {
+///Atomic SQL exec.
+//tested on MySQL update
+//todo:handle errors-
+//todo:implement query
+//todo: implement queryrow - that returns at most one row
+//Exec executes a query without returning any rows
+func (this *SessionController) Exec(jobContext JobContext) {
+	ShowDebuginfo(jobContext.Debug,jobContext)
+	ShowDebuginfo(jobContext.Debug,jobContext.JobData)
 	//store start time
 	jobContext.JobData.StartTime = time.Now()
 	defer func() {
@@ -167,13 +195,15 @@ func (this *SessionController) SQLUpdate(jobContext JobContext) {
 		jobContext.JobData.StopTime = time.Now()
 		//notify producer that another job has finished
 		jobContext.JobDataChannel <- jobContext.JobData
+		//
+		ShowDebuginfo(jobContext.Debug,jobContext)
+		ShowDebuginfo(jobContext.Debug,jobContext.JobData)
 	}()
-
-	//fmt.Printf("start: job_id=%d, start_id=%d stop_id=%d\n",jobId, startid, limit)
 
 	//how to use connection pool?
 	db, err := sql.Open("mysql", jobContext.Dsn)
 	if err != nil {
+		ShowDebuginfo(jobContext.Debug,err)
 		panic(err)
 	}
 	defer db.Close()
@@ -184,18 +214,29 @@ func (this *SessionController) SQLUpdate(jobContext JobContext) {
 	}
 
 	if err != nil {
+		ShowDebuginfo(jobContext.Debug,err)
 		panic(err)
 	}
 
+	fmt.Println(jobContext.JobData.Query)
 	//all data source details should be well encapsulated
-	_, err = db.Exec(jobContext.Query)
+	_, err = db.Exec(jobContext.JobData.Query)
 
 	//log.Print("query finished:", query)
 
 	if err != nil {
+		ShowDebuginfo(jobContext.Debug,err)
 		panic(err)
 	}
 
 	//fmt.Printf("end: job_id=%d,start_id=%d stop_id=%d\n",jobId, startid, limit)
 }
 
+func ShowDebuginfo(b bool, v interface{}){
+	defer func(){
+		recover()
+	}()
+	if b{
+		fmt.Printf("%#v\n",v)
+	}
+}
