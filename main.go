@@ -9,17 +9,13 @@ package main
 //	MySQL schema issues
 
 import (
-	"database/sql"
-	_ "database/sql/driver"
 	"encoding/json"
 	"flag"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
 	"io/ioutil"
 	"log"
 	"os"
 	"time"
-	_ "time"
 )
 
 type JobConfiguration struct {
@@ -32,6 +28,10 @@ const (
 	DefaultStatusFileName = "tasks.json"
 )
 
+var Notifier *NotificationsModule
+//global module for recording session,task, job progress
+var Monitoring Monitor
+
 func main() {
 
 	var configFileName = flag.String("config", "", "configuration file")
@@ -43,28 +43,37 @@ func main() {
 		os.Exit(1)
 	}
 
-	configuration := loadConfiguration(*configFileName)
+	//if file is corrupted then we get nil
+	//if types dont match then we get zero value for that structure
+	configuration := loadSessionConfiguration(*configFileName)
 	if configuration == nil {
 		fmt.Println("configuration load error")
 		os.Exit(1)
 	}
 
-
-	fmt.Printf("Configuration loaded. Found %d tasks", len(configuration.Tasks))
-
-	var sessionController 	SessionController
-	//start new session
-	if sessionController:=	makeSession(configuration);sessionController==nil{
+	if Monitoring=makeMonitoring(configuration.Monitoring);Monitoring==nil{
 		os.Exit(1)
 	}
-	sessionController.StartTask(&configuration.Tasks[0])
+
+	fmt.Printf("Configuration loaded. Found %d tasks\n", len(configuration.Tasks))
+
+	configuration.SessionID	=	time.Now().Format(time.UnixDate)
+	configuration.Done		=	make(chan struct{})
+	var sessionController 	*SessionController
+	//start new session
+	if sessionController=	makeSession(*configuration);sessionController==nil{
+		os.Exit(1)
+	}
+
+	go sessionController.StartTasks()
 
 	var key string
-	fmt.Scanf("%s", &key)
+	fmt.Scanf("Press key if you want to finish %s",&key)
+	close(configuration.Done)
 }
 
 //
-func loadConfiguration(configurationFileName string) (configuration*SessionConfiguration) {
+func loadSessionConfiguration(configurationFileName string) (configuration*SessionConfiguration) {
 	defer func() {
 		if err := recover(); err != nil {
 			fmt.Println(err)
@@ -103,4 +112,3 @@ func SerialiseStruct(v interface{}) {
 	//owner=read+wqrite, group and others=read
 	ioutil.WriteFile(DefaultStatusFileName, bytes, 0644)
 }
-

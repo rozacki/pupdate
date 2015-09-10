@@ -1,6 +1,11 @@
 package main
 
+import(
+
+)
+
 type TaskConfiguration struct {
+
 	Name   string
 	Dsn    string
 	Update string
@@ -21,4 +26,17 @@ type TaskConfiguration struct {
 	Disabled bool
 	//
 	Debug bool
+//**************** dynamic parameters
+	//current session id
+	SessionId string
+	//current task Id
+	TaskId string
+}
+//TaskConfiguration extands existing MonitoringModule
+func (this* TaskConfiguration) EventStartTask()(*MonitoringError){
+	return Monitoring.Event(this.SessionId,this.TaskId,"",StartSession,this)
+}
+
+func (this* TaskConfiguration) EventStopTask()(*MonitoringError){
+	return Monitoring.Event(this.SessionId,this.TaskId,"",StopTask,this)
 }

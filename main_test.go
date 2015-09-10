@@ -23,7 +23,7 @@ func TestStartTask(T *testing.T) {
 		T.Fatal(err.Error())
 	}
 	for _, configFileName := range configs {
-		configuration := loadConfiguration(configFileName)
+		configuration := loadSessionConfiguration(configFileName)
 		if configuration == nil {
 			T.Logf("configuration load error %s\n", configFileName)
 			continue

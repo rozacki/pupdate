@@ -3,43 +3,68 @@ package main
 import(
 	"fmt"
 	"time"
+	_ "github.com/go-sql-driver/mysql"
+	"database/sql"
 )
 
 type SessionController struct {
-	SessionID	string
-	JobDataChannel chan (*JobData)
-	TaskCounter	uint64
 	Configuration SessionConfiguration
 }
 
 func makeSession(configuration SessionConfiguration)(session* SessionController){
-	//is there  any task to schedul?
+	//is there  any task to schedule?
 	if len(configuration.Tasks)==0{
 		fmt.Println("no tasks to schedule, stop")
 		return nil
 	}
 
-	var sessionController=	SessionController{SessionID:time.Now().Format(time.UnixDate),Configuration:configuration}
-	sessionController.JobDataChannel=make(chan *JobData, configuration.Tasks[0].Concurrency)
+	//generate session name
+	sessionController:=SessionController{Configuration:configuration}
+	//try to record progress, if fails it means that monitoring module is not ok
+	if err:=configuration.StartSession();err!=nil{
+		return nil
+	}
 	return &sessionController
 }
 
 //Runs job in order
-func (this *SessionController) StartTasks(configuration *TaskConfiguration) {
-	for task:=range this.Configuration.Tasks{
-		taskData:=this.startTask(task)
+func (this *SessionController) StartTasks() {
+	for _,task:=range this.Configuration.Tasks{
+		//
+		this.Configuration.TaskCounter++
+		//synchronous task
+		this.startTask(task,this.Configuration.Done)
+		//
+		//Monitoring
+		//todo:check success
+		/*
 		if taskData.Success==false{
 			fmt.Printf("task failed:%n",)
 		}
+		*/
+		//should I finish
+		select{
+		//finished when task reacts on channel clousure
+		case <-this.Configuration.Done:
+			fmt.Printf("task exiting\n")
+			return
+		}
 	}
+	this.Configuration.StopSession()
 }
-//
-func (this *SessionController) startTask(configuration *TaskConfiguration) TaskData {
-	//
-	this.TaskCounter++
+//runs single task by spawning jobs
+//todo: cancellation via done channel
+//todo: move to taskcontroller
+func (this *SessionController) startTask(configuration TaskConfiguration, done <-chan struct{}) TaskData {
+	//todo:pass context interfaces via configuration
+	configuration.EventStartTask()
+	defer func(){
+		configuration.EventStopTask()
+	}()
 	//create new task data structure where we hold op data and configuration
-	var taskData 			= 	TaskData{Id: this.TaskCounter, DataCursor: configuration.Min, Status: "working", TaskConfiguration: *configuration}
-	var NoJobs				=	((configuration.Max - configuration.Min)/configuration.Step)
+	var taskData 			= 	TaskData{Id: this.Configuration.TaskCounter, DataCursor: configuration.Min, Status: "working", TaskConfiguration: configuration}
+	var JobsCount 			=	((configuration.Max - configuration.Min)/configuration.Step)
+	var jobDataChannel		=	make(chan *JobData, configuration.Concurrency)
 
 	if configuration.Debug {
 		fmt.Printf("%+v\n", configuration)
@@ -48,7 +73,7 @@ func (this *SessionController) startTask(configuration *TaskConfiguration) TaskD
 	for {
 		var jobData *JobData
 		select {
-		case jobData = <-this.JobDataChannel:
+		case jobData = <-jobDataChannel:
 			{
 				//check status, if it error then scheduled it again
 				if jobData.Error {
@@ -72,13 +97,17 @@ func (this *SessionController) startTask(configuration *TaskConfiguration) TaskD
 			}
 		//
 		case <-time.After(time.Duration(taskData.Timeout) * time.Millisecond):
+		//cancellation
+		case <-done:
+			//return current state of task
+			return taskData
 		}
 
 		//if queue length reached its limit
 		// or exhausted stream
 		// or finished
 		// then we cannot schedule more jobs
-		if taskData.QueueLength < configuration.Concurrency&& (taskData.Success+taskData.MaxAttemptJobsDropped+taskData.QueueLength) < NoJobs{
+		if taskData.QueueLength < configuration.Concurrency&& (taskData.Success+taskData.MaxAttemptJobsDropped+taskData.QueueLength) < JobsCount {
 
 			//if current job is empty then we create new job
 			if jobData == nil {
@@ -91,7 +120,7 @@ func (this *SessionController) startTask(configuration *TaskConfiguration) TaskD
 			}
 			//todo: switch case here
 			//schedule the job
-			go this.SQLUpdate(jobData, configuration.Dsn, configuration.SessionParam, fmt.Sprintf(configuration.Update, jobData.PartStart, jobData.PartEnd))
+			go this.SQLUpdate( JobContext{JobData:jobData,Dsn:configuration.Dsn,SessionParams:configuration.SessionParam,Query:fmt.Sprintf(configuration.Update, jobData.PartStart, jobData.PartEnd),JobDataChannel:jobDataChannel})
 			//increase queue length
 			taskData.QueueLength++
 			//reset timeout
@@ -104,11 +133,12 @@ func (this *SessionController) startTask(configuration *TaskConfiguration) TaskD
 			}
 		}
 		//have we finished yet?
-		if (taskData.Success+taskData.MaxAttemptJobsDropped+taskData.QueueLength) >= NoJobs {
+		if (taskData.Success+taskData.MaxAttemptJobsDropped+taskData.QueueLength) >= JobsCount {
 			taskData.Status = "finishing"
 			if taskData.QueueLength == 0 {
 				taskData.Status = "finished"
 				SerialiseStruct(taskData)
+				close(jobDataChannel)
 				return taskData
 			}
 		}
@@ -120,37 +150,37 @@ func (this *SessionController) startTask(configuration *TaskConfiguration) TaskD
 	}
 }
 
-
+///Atomic SQL update.
 //tested on MySQL updated
-func (this *SessionController) SQLUpdate(jobData *JobData, dsn string, sessionParams string, query string) {
+func (this *SessionController) SQLUpdate(jobContext JobContext) {
 	//store start time
-	jobData.StartTime = time.Now()
+	jobContext.JobData.StartTime = time.Now()
 	defer func() {
 		if err := recover(); err != nil {
 			//log.Println(err)
-			jobData.Error = true
+			jobContext.JobData.Error = true
 			//jobData.ErrorMsg=err.Error()
 		}
 		//increase number of attmpts
-		jobData.Attempts++
+		jobContext.JobData.Attempts++
 		//record data
-		jobData.StopTime = time.Now()
+		jobContext.JobData.StopTime = time.Now()
 		//notify producer that another job has finished
-		this.JobDataChannel <- jobData
+		jobContext.JobDataChannel <- jobContext.JobData
 	}()
 
 	//fmt.Printf("start: job_id=%d, start_id=%d stop_id=%d\n",jobId, startid, limit)
 
 	//how to use connection pool?
-	db, err := sql.Open("mysql", dsn)
+	db, err := sql.Open("mysql", jobContext.Dsn)
 	if err != nil {
 		panic(err)
 	}
 	defer db.Close()
 	//log.Print("connection open ", Dsn)
 
-	if len(sessionParams) > 0 {
-		_, err = db.Exec(sessionParams)
+	if len(jobContext.SessionParams) > 0 {
+		_, err = db.Exec(jobContext.SessionParams)
 	}
 
 	if err != nil {
@@ -158,7 +188,7 @@ func (this *SessionController) SQLUpdate(jobData *JobData, dsn string, sessionPa
 	}
 
 	//all data source details should be well encapsulated
-	_, err = db.Exec(query)
+	_, err = db.Exec(jobContext.Query)
 
 	//log.Print("query finished:", query)
 

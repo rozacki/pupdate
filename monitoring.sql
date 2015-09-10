@@ -5,12 +5,13 @@ drop dable if exists `events`;
   `id` int(11) NOT NULL,
   `ts` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `session` varchar(45) NOT NULL,
-  `task` int(11) NOT NULL,
-  `job` int(11) DEFAULT NULL,
+  `task_name` varchar(45) DEFAULT NULL COMMENT ''each task has its logical name for example: make, vehicle, test'',
+  `task_id` varchar(45) DEFAULT NULL,
+  `job` varchar(45) DEFAULT NULL,
   `event` varchar(255) NOT NULL,
   `data` mediumtext,
   PRIMARY KEY (`id`),
-  KEY `task_idx` (`task`),
+  KEY `task_idx` (`task_id`),
   KEY `session_idx` (`session`),
   KEY `job_idx` (`job`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1'
