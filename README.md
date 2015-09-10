@@ -9,4 +9,3 @@
 -parametrize task storage type: mysql, mongodb, elastic elastic
 -parametrize task method: update, select elastic
 -parametrize task: add special value (string) to indicate that all rows should be processed instead of providing max(id)
--
