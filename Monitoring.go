@@ -5,11 +5,13 @@ import (
 )
 
 const(
-	StartSession ="session_start"
-	StartTask ="new_task"
-	StopSession="stop_session"
-	StopTask="stop_task"
-	Event="event"
+	StartSession="StartSession"
+	StartTask="StartTask"
+	StopSession="StopSession"
+	StopTask="StopTask"
+	Trace="Trace"
+	StartJob="StartJob"
+	StopJob="StopJob"
 )
 
 //Monitoring module
@@ -62,6 +64,7 @@ func (this*MonitoringModule) Event(sid string,taskName string,tid uint64,jid uin
 		event,sid ,taskName ,tid ,jid,data,
 	}
 	//fmt.Printf("Event: %s %s %d %d %s %#v\n",sid,taskName,tid,jid,event,data)
+	fmt.Println("##########")
 	fmt.Printf("%+v\n",Event)
 	return nil
 }
