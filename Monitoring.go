@@ -2,6 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	_"time"
+	_"path"
+	_"sort"
 )
 
 const(
@@ -12,12 +17,25 @@ const(
 	Trace="Trace"
 	StartJob="StartJob"
 	StopJob="StopJob"
+
+	SessionLogFileExt 		=	".log"
+	DatSessionLogFileExt =	".dat"
+	SessionLogFolder		=	"monitoring"
+
+	//this is how it is stored as session file name, up to seconds
+	SessionFileFormat	  = "2006-01-02 15:04:05"
+	//this is how it is presented to SQL, daily granularity
+	LastEtlFileFormat	  =	"2006-01-02"
+	//last etl variable name used in sql staements
+	LastEtlVariableName		="$last_etl"
 )
 
 //Monitoring module
 //todo:
 type MonitoringModule struct{
 	Configuration MonitoringConfiguration
+	File *os.File
+	FileName string
 }
 
 //Error information sepcific to Monitoring module
@@ -52,7 +70,15 @@ func (this*MonitoringModule) record(msg string)(err error){
 	return nil
 }
 
-func (this*MonitoringModule) Event(sid string,taskName string,tid uint64,jid uint64,event string,data interface{})(*MonitoringError){
+func (this*MonitoringModule) Trace(sid string,taskName string,tid uint64,jid uint64,event string,data interface{})(*MonitoringError){
+	return this.TraceOK(sid,taskName ,tid ,jid ,event ,data,false)
+}
+
+func (this*MonitoringModule) TraceOK(sid string,taskName string,tid uint64,jid uint64,event string,data interface{}, ok bool)(*MonitoringError){
+	if len(sid)==0{
+		this.log("missing session id")
+		return nil
+	}
 	Event:=struct{
 		Ev string
 		SID string
@@ -63,12 +89,42 @@ func (this*MonitoringModule) Event(sid string,taskName string,tid uint64,jid uin
 	}{
 		event,sid ,taskName ,tid ,jid,data,
 	}
-	//fmt.Printf("Event: %s %s %d %d %s %#v\n",sid,taskName,tid,jid,event,data)
-	fmt.Println("##########")
-	fmt.Printf("%+v\n",Event)
+	var err error
+	//is log file specific for this sesion is open now?
+	//I don't check if event type is "NewSession"
+	if this.File==nil{
+		//if file sid file is not open and does not exist then open it
+		//if file is not open and does exist then fmt.Println() and return
+		this.FileName=filepath.Join(SessionLogFolder,sid+SessionLogFileExt)
+		if this.File,err=os.OpenFile(this.FileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY| os.O_EXCL, 0600);err!=nil{
+			this.log("error '%s' during creating session file '%s' ",err.Error(), this.FileName)
+			return nil
+		}
+		this.log("session file '%s' created",this.FileName)
+	}
+
+	s:= fmt.Sprintf("\n %+v \n",Event)
+	if _, err = this.File.WriteString(s); err != nil {
+		return nil
+	}
+
+	//if event=="StopSession" then write event, close the file and change the name
+	if event==StopSession{
+		this.File.Close()
+		this.log("session log closed")
+		if ok{
+			os.Rename(this.FileName,filepath.Join(SessionLogFolder,sid+DatSessionLogFileExt))
+			this.log("session log renamed")
+		}
+	}
+
 	return nil
 }
-
+func (this*MonitoringModule)log(format string,args... string){
+	fmt.Printf("monitoring:"+format+"\n",args)
+}
+//Depeneding on configuration we can support db monitoring.
+// Currently we suport only log-based monitoring
 type MonitoringConfiguration struct{
 	Dsn string
 }
@@ -78,11 +134,36 @@ func makeMonitoring(configuration MonitoringConfiguration)(Monitor){
 		fmt.Printf("missing dsn for monitoring module")
 		return nil;
 	}
+	//we support only one monitoring type
 	return &MonitoringModule{Configuration:configuration}
 }
 
 //specific interface for monitoring tasks
 type Monitor interface{
 	//generic method
-	Event(sid string,taskName string,tid uint64,jid uint64,event string,data interface{})(*MonitoringError)
+	Trace(sid string,taskName string,tid uint64,jid uint64,event string,data interface{})(*MonitoringError)
+	//generic method thta accespts success ot false
+	TraceOK(sid string,taskName string,tid uint64,jid uint64,event string,data interface{}, ok bool)(*MonitoringError)
 }
+/*
+func findLastEtlTime() time.Time{
+	if matches, err:= filepath.Glob(path.Join(SessionLogFolder,"*"+DatSessionLogFileExt));err!=nil{
+		return nil
+	}
+
+	//sort
+	sortedFileNames:=sort.Strings(ByLength(matches))
+
+	time.Parse(SessionFileFormat)
+}
+type ByLength []string
+func (s ByLength) Len() int {
+	return len(s)
+}
+func (s ByLength) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s ByLength) Less(i, j int) bool {
+	return len(s[i]) < len(s[j])
+}
+*/

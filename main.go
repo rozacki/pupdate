@@ -28,11 +28,18 @@ const (
 	DefaultStatusFileName = "tasks.json"
 )
 
+//will be used to notify users about some important facts
 var Notifier *NotificationsModule
 //global module for recording session,task, job progress
 var Monitoring Monitor
+//last etl
+var LastEtl	time.Time
 
 func main() {
+
+	//LastEtl,_:=time.Parse(SessionFileFormat,"2015-01-02 15:04:05")
+	//fmt.Println(LastEtl.Format(LastEtlFileFormat))
+	//os.Exit(1)
 
 	var configFileName = flag.String("config", "", "configuration file")
 	flag.Parse()
@@ -55,22 +62,28 @@ func main() {
 		os.Exit(1)
 	}
 
+	//find last_elt timestamp
+
+
 	fmt.Printf("Configuration loaded. Found %d tasks\n", len(configuration.Tasks))
 
-	configuration.SessionID	=	time.Now().Format(time.UnixDate)
+	configuration.SessionID	=	time.Now().Format(time.Stamp)
 	configuration.Done		=	make(chan struct{})
 	var sessionController 	*SessionController
 	//start new session
-	if sessionController=	makeSession(*configuration);sessionController==nil{
+	if sessionController=	makeSessionController(*configuration);sessionController==nil{
 		os.Exit(1)
 	}
 
-	go sessionController.StartTasks()
+	sessionController.StartTasks()
+	close(configuration.Done)
 
+	/*
 	var key string
 	fmt.Println("Press key if you want to finish")
 	fmt.Scanf("%s",&key)
 	close(configuration.Done)
+	*/
 }
 
 //

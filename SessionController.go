@@ -11,7 +11,7 @@ type SessionController struct {
 	Configuration SessionConfiguration
 }
 
-func makeSession(configuration SessionConfiguration)(session* SessionController){
+func makeSessionController(configuration SessionConfiguration)(session* SessionController){
 	//is there  any task to schedule?
 	if len(configuration.Tasks)==0{
 		fmt.Println("no tasks to schedule, stop")
@@ -30,7 +30,9 @@ func makeSession(configuration SessionConfiguration)(session* SessionController)
 //Runs job in order
 func (this *SessionController) StartTasks() {
 	for _,task:=range this.Configuration.Tasks{
+		//if task is disabled then we skip it
 		if task.Disabled{
+			this.Configuration.Trace(fmt.Sprintf("Task disabled:%",task.Name))
 			continue
 		}
 		//
@@ -38,10 +40,16 @@ func (this *SessionController) StartTasks() {
 		//
 		task.SessionId	=	this.Configuration.SessionID
 		//synchronous task
-		this.startTask(task,this.Configuration.Done)
+		taskData:=this.startTask(task,this.Configuration.Done)
 		//
 		//Monitoring
-		//todo:check success
+		//todo:check success MaxAttemptJobsDropped==0
+		if taskData.MaxAttemptJobsDropped>0{
+			//we record it
+			this.Configuration.Trace(fmt.Sprintf("session failed: '%s'. Task details %+v",taskData.LastDroppedJob.LastErrorMsg,taskData))
+			this.Configuration.SessionFail()
+			return
+		}
 		//if sucess then store task.CreationTime and flag success
 		/*
 		if taskData.Success==false{
@@ -57,16 +65,14 @@ func (this *SessionController) StartTasks() {
 		case  <-time.After(1* time.Millisecond):
 		}
 	}
-	this.Configuration.StopSession()
+	this.Configuration.SessionSuccess()
 }
 //runs single task by spawning jobs
 //todo: cancellation via done channel
 //todo: move to taskcontroller
 func (this *SessionController) startTask(configuration TaskConfiguration, done <-chan struct{}) TaskData {
 	configuration.EventStartTask()
-	defer func(){
-		configuration.EventStopTask()
-	}()
+
 	//create new task data structure where we hold op data and configuration
 	var taskData 			= 	TaskData{Id: this.Configuration.TaskCounter, DataCursor: configuration.Min, Status: "working", TaskConfiguration: configuration,CreationTime:time.Now()}
 	var JobsCount	uint64
@@ -79,7 +85,19 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 	}else {
 		JobsCount	= ((configuration.Max - configuration.Min)/configuration.Step)
 	}
+	//when job finished then posts its status here
 	var jobDataChannel		=	make(chan *JobData, configuration.Concurrency)
+	//
+	defer func(){
+		//record that fact
+		configuration.EventStopTask()
+		//last serialisation
+		SerialiseStruct(taskData)
+		//close task<-job comm channel
+		close(jobDataChannel)
+		//
+		ShowDebuginfo(configuration.Debug, configuration)
+	}()
 
 	ShowDebuginfo(configuration.Debug, configuration)
 
@@ -91,14 +109,21 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 				//check status, if it error then scheduled it again
 				if jobData.Error {
 					ShowDebuginfo(configuration.Debug,jobData)
-					//reset flag and try again
-					jobData.Error = false
 					//increment errors counter
 					taskData.Errors++
+					//record last dropped
+					taskData.LastDroppedJob=*jobData
 					if jobData.Attempts == configuration.MaxAttempts {
+						//record how many has been dropped- it will be only one
 						taskData.MaxAttemptJobsDropped++
-						jobData = nil
+						//
+						taskData.LastDroppedJob.LastErrorMsg="max attempts reached"
+						//we quit on first dropped job
+						return taskData
 					}
+					//reset flag and try again
+					jobData.Error = false
+
 				} else {
 					taskData.Success++
 				}
@@ -160,8 +185,6 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 			taskData.Status = "finishing"
 			if taskData.QueueLength == 0 {
 				taskData.Status = "finished"
-				SerialiseStruct(taskData)
-				close(jobDataChannel)
 				return taskData
 			}
 		}

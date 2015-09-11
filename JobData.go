@@ -11,7 +11,7 @@ type JobData struct {
 	StartTime time.Time
 	StopTime  time.Time
 	Error     bool
-	ErrorMsg  string
+	LastErrorMsg string
 	Attempts  uint64
 	//
 	Query string

@@ -24,6 +24,9 @@ type TaskData struct {
 	MaxAttemptJobsDropped uint64
 	//
 	JobId uint64
+	//todo: not used
 	//Can be used to register last sucessfull ETL
 	CreationTime time.Time
+	//last dropped job
+	LastDroppedJob JobData
 }
