@@ -7,3 +7,16 @@ type JobContext struct{
 	JobDataChannel chan *JobData
 	Debug bool
 }
+
+//TaskConfiguration extands existing MonitoringModule
+func (this* JobContext) EventStartJob()(*MonitoringError){
+	return Monitoring.Event("","",0,this.JobData.Id,StartJob,this.JobData)
+}
+
+func (this* JobContext) EventStopTJob()(*MonitoringError){
+	return Monitoring.Event("","",0,this.JobData.Id,StopJob,this.JobData)
+}
+
+func (this* JobContext) Event(data interface{})(*MonitoringError){
+	return Monitoring.Event("","",0,this.JobData.Id,Trace,data)
+}
