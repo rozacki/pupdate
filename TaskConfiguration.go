@@ -42,5 +42,5 @@ func (this* TaskConfiguration) EventStopTask()(*MonitoringError){
 }
 
 func (this* TaskConfiguration) Event(data interface{})(*MonitoringError){
-	return Monitoring.Event(this.SessionId,this.Name,this.TaskId,0,Event,this)
+	return Monitoring.Event(this.SessionId,this.Name,this.TaskId,0, Trace,data)
 }

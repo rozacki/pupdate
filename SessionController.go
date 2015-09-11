@@ -30,6 +30,9 @@ func makeSession(configuration SessionConfiguration)(session* SessionController)
 //Runs job in order
 func (this *SessionController) StartTasks() {
 	for _,task:=range this.Configuration.Tasks{
+		if task.Disabled{
+			continue
+		}
 		//
 		this.Configuration.TaskCounter++
 		//
@@ -47,7 +50,7 @@ func (this *SessionController) StartTasks() {
 		*/
 		//should I finish
 		select{
-		//finished when task reacts on channel clousure
+		//global flag to finish processing. it is used by main thread and allow user to signal termination
 		case <-this.Configuration.Done:
 			fmt.Printf("task exiting\n")
 			return
@@ -132,8 +135,6 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 				taskData.JobId++
 			}
 
-			configuration.Event("I'm here")
-
 			jobContext:=	JobContext{JobData:jobData,
 				Dsn:configuration.Dsn,
 				SessionParams:configuration.SessionParam,
@@ -179,6 +180,8 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 //todo: implement queryrow - that returns at most one row
 //Exec executes a query without returning any rows
 func (this *SessionController) Exec(jobContext JobContext) {
+	//monitoring-start job
+	jobContext.EventStartJob()
 	ShowDebuginfo(jobContext.Debug,jobContext)
 	ShowDebuginfo(jobContext.Debug,jobContext.JobData)
 	//store start time
@@ -198,6 +201,8 @@ func (this *SessionController) Exec(jobContext JobContext) {
 		//
 		ShowDebuginfo(jobContext.Debug,jobContext)
 		ShowDebuginfo(jobContext.Debug,jobContext.JobData)
+		//monitor-finish job
+		jobContext.EventStopTJob()
 	}()
 
 	//how to use connection pool?
