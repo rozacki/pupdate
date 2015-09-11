@@ -1,5 +1,13 @@
 {
-  "Name":"unit test task controller, edge case, invalid db configuration, should reschedule max*3/step, concurrently",
+  "Monitoring":{
+    "Dsn":"root:root@dockerhost:32768/monitoring"
+  },
+  "Notifications":{
+    "Email":"chris.rozacki@valtech.co.uk"
+  },
+  "Tasks":[{
+    "Name":"t4",
+  "Description":"unit test task controller, edge case, invalid db configuration, should reschedule max*3/step, concurrently",
   "SessionParam":  "set session group_concat_max_len=100000",
   "Dsn":  "moth:pass@tcp(localhost:3306)/moth",
   "Update": "select * from testresult where id>=%d and id<%d;",
@@ -11,4 +19,6 @@
   "MaxAttempts":3,
   "Debug":false,
   "-issue descriptin":"gets into infite lopp after first attempt: scheudle first, queue>1,sets status to finishing"
+}
+  ]
 }

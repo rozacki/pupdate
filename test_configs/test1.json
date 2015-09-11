@@ -1,13 +1,24 @@
 {
-  "Name":"unit test task controller, edge case, invalid db configuration, should reschedule the only until max attempts reached",
-  "SessionParam":  "set session group_concat_max_len=100000",
-  "Dsn":  "moth:pass@tcp(localhost:3306)/moth",
-  "Update": "select * from testresult where id>=%d and id<%d;",
-  "Max": 1,
-  "Min": 0,
-  "Step": 1,
-  "Concurrency": 1,
-  "Method":"TestUpdate",
-  "MaxAttempts":3,
-  "Debug":false
+  "Monitoring": {
+    "Dsn": "root:root@dockerhost:32768/monitoring"
+  },
+  "Notifications": {
+    "Email": "chris.rozacki@valtech.co.uk"
+  },
+  "Tasks": [
+    {
+      "Name": "t1",
+      "Description": "unit test task controller, edge case, invalid db configuration, should reschedule the only until max attempts reached",
+      "SessionParam": "set session group_concat_max_len=100000",
+      "Dsn": "moth:pass@tcp(localhost:3306)/moth",
+      "Update": "select * from testresult where id>=%d and id<%d;",
+      "Max": 1,
+      "Min": 0,
+      "Step": 1,
+      "Concurrency": 1,
+      "Method": "TestUpdate",
+      "MaxAttempts": 3,
+      "Debug": false
+    }
+  ]
 }

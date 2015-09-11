@@ -14,7 +14,7 @@
 "Update": "select * from testresult where id>=%d and id<%d;",
 "Max": 10,
 "Min": 0,
-"Step": 10,
+"Step": 5,
 "Concurrency": 2,
 "Method": "TestUpdate",
 "MaxAttempts": 3,
