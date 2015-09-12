@@ -1,4 +1,5 @@
 package main
+import _"fmt"
 
 type SessionConfiguration struct{
 	//monitoring
@@ -28,4 +29,13 @@ func (this *SessionConfiguration) SessionFail()(*MonitoringError){
 
 func (this *SessionConfiguration) Trace(msg string)(*MonitoringError){
 	return Monitoring.Trace(this.SessionID,"",0,0,Trace,msg)
+}
+
+func (this*SessionConfiguration) Init()error{
+	for i,_:=range this.Tasks{
+		if err:=this.Tasks[i].Init();err!=nil{
+			return err
+		}
+	}
+	return nil;
 }

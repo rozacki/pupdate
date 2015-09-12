@@ -2,6 +2,8 @@ package main
 
 import(
 
+	"strings"
+	_"fmt"
 )
 
 type TaskConfiguration struct {
@@ -9,6 +11,7 @@ type TaskConfiguration struct {
 	Name   string
 	Dsn    string
 	Exec   string
+	ExecTab[] string
 	//it will be first parameter in the query
 	//todo: add special value (string) to indicate that all rows. staring from MIN should be transferred
 	Max uint64
@@ -43,4 +46,11 @@ func (this* TaskConfiguration) EventStopTask()(*MonitoringError){
 
 func (this* TaskConfiguration) Trace(data interface{})(*MonitoringError){
 	return Monitoring.Trace(this.SessionId,this.Name,this.TaskId,0, Trace,data)
+}
+//does some housekeeping int he task configuration, shoudl be called after configuration is loaded
+func (this* TaskConfiguration) Init() error{
+	//join ExecTab into Exec if Exec is emopty and ExecTab is not
+	this.Exec=strings.Join(this.ExecTab,"")
+	//fmt.Println(this.Exec)
+	return nil
 }

@@ -29,7 +29,7 @@
       "Description":"updates all existsing vehicles based on id makes regardless of last_updated_on",
       "SessionParam": "",
       "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
-      "Exec": "update MOTH3.vehiclemanufacturer mm left join make m on mm.id=m.id set mm.name=m.name where m.last_updated_on;",
+      "Exec": "update MOTH3.vehicle vh left join vehicle v on vh.id=v.id set vh.registration=v.registration where v.last_updated_on>'$LastEtl';",
       "MaxAttempts": 3,
       "Debug":false,
       "Disabled":false

@@ -10,7 +10,7 @@
     "Description":"updates all vehicles which have changed since",
     "SessionParam": "",
     "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
-    "Exec": "select * from mot_test where last_updated_on>'$last_etl';",
+    "Exec": "select * from mot_test where last_updated_on>'$LastEtl';",
     "-Exec": "select * from mot_test where last_updated_on>'0001-01-01 00:00:00';",
     "MaxAttempts": 3,
     "Debug":true

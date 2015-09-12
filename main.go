@@ -16,6 +16,7 @@ import (
 	"log"
 	"os"
 	"time"
+	_"strings"
 )
 
 type JobConfiguration struct {
@@ -26,6 +27,8 @@ const (
 	TaskMethod_SQLUpdate  = "SQLUpdate"
 	TaskMethod_TestUpdate = "TestUpdate"
 	DefaultStatusFileName = "tasks.json"
+	//must be exact match
+	LastEtlVarName			="$LastEtl"
 )
 
 //will be used to notify users about some important facts
@@ -63,11 +66,19 @@ func main() {
 	}
 
 	//find last_elt timestamp
+	if lastEtl,err:=findLastEtlTime(); err!=nil{
+		logMsg("error finding $LastEtl:%s\n", err)
+		os.Exit(1)
+	}else{
+		LastEtl=lastEtl
+	}
+	//logMsg("$LastEtl = %s\n",LastEtl.Format(LastEtlFileFormat))
 
+	//logMsg(strings.Replace("select * from mot_test where last_updated_on>'$LastEtl';",LastEtlVarName,LastEtl.Format(LastEtlFileFormat),-1 ))
 
-	fmt.Printf("Configuration loaded. Found %d tasks\n", len(configuration.Tasks))
+	logMsg("Configuration loaded. Found %d tasks\n", len(configuration.Tasks))
 
-	configuration.SessionID	=	time.Now().Format(time.Stamp)
+	configuration.SessionID	=	time.Now().Format(SessionFileFormat)
 	configuration.Done		=	make(chan struct{})
 	var sessionController 	*SessionController
 	//start new session
@@ -103,6 +114,10 @@ func loadSessionConfiguration(configurationFileName string) (configuration*Sessi
 		panic(err)
 	}
 
+	if err:= configuration.Init();err!=nil{
+		panic(err)
+	}
+
 	return configuration
 }
 
@@ -125,4 +140,7 @@ func SerialiseStruct(v interface{}) {
 	bytes, _ := json.Marshal(v)
 	//owner=read+wqrite, group and others=read
 	ioutil.WriteFile(DefaultStatusFileName, bytes, 0644)
+}
+func logMsg(format string,args... interface{}){
+	fmt.Printf("main:"+format+"\n",args)
 }
