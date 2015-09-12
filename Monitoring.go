@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	_"time"
-	_"path"
+	"time"
+	"path"
 	_"sort"
+	"strings"
 )
 
 const(
@@ -145,25 +146,27 @@ type Monitor interface{
 	//generic method thta accespts success ot false
 	TraceOK(sid string,taskName string,tid uint64,jid uint64,event string,data interface{}, ok bool)(*MonitoringError)
 }
-/*
-func findLastEtlTime() time.Time{
-	if matches, err:= filepath.Glob(path.Join(SessionLogFolder,"*"+DatSessionLogFileExt));err!=nil{
-		return nil
+
+func findLastEtlTime() (time.Time,error) {
+	var currTime time.Time
+	var matches []string
+	var err error
+	if matches, err= filepath.Glob(path.Join(SessionLogFolder, "*"+DatSessionLogFileExt)); err!=nil {
+		return currTime, err
 	}
 
-	//sort
-	sortedFileNames:=sort.Strings(ByLength(matches))
-
-	time.Parse(SessionFileFormat)
+	for _,filePath := range matches {
+		_,fileName:=filepath.Split(filePath)
+		//strip extension
+		fileName=strings.TrimSuffix(fileName,filepath.Ext(fileName))
+		fmt.Println(fileName)
+		time, err := time.Parse(SessionFileFormat, fileName)
+		if err!=nil {
+			continue
+		}
+		if currTime.Sub(time)<0{
+			currTime=time
+		}
+	}
+	return currTime,nil
 }
-type ByLength []string
-func (s ByLength) Len() int {
-	return len(s)
-}
-func (s ByLength) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-func (s ByLength) Less(i, j int) bool {
-	return len(s[i]) < len(s[j])
-}
-*/
