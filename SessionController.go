@@ -98,10 +98,10 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 		//close task<-job comm channel
 		close(jobDataChannel)
 		//
-		ShowDebuginfo(configuration.Debug, configuration)
+		Debug(configuration.Debug, configuration)
 	}()
 
-	ShowDebuginfo(configuration.Debug, configuration)
+	Debug(configuration.Debug, configuration)
 
 	for {
 		var jobData *JobData
@@ -110,7 +110,7 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 			{
 				//check status, if it error then scheduled it again
 				if jobData.Error {
-					ShowDebuginfo(configuration.Debug,jobData)
+					Debug(configuration.Debug,jobData)
 					//increment errors counter
 					taskData.Errors++
 					//record last dropped
@@ -169,7 +169,7 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 				SessionParams:configuration.SessionParam,
 				JobDataChannel:jobDataChannel,
 				Debug:configuration.Debug}
-			ShowDebuginfo(configuration.Debug,jobContext)
+			Debug(configuration.Debug,jobContext)
 			//schedule the job
 			//todo: switch case here: Exec, Query, QueryOne
 			go this.Exec(jobContext)
@@ -207,13 +207,15 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 //todo: implement queryrow - that returns at most one row
 //Exec executes a query without returning any rows
 func (this *SessionController) Exec(jobContext JobContext) {
+	//how many rows were affected by Exec() (if supported by SQL driver)
 	var totalRowsAffected uint64
+
 	//monitoring-start job
 	jobContext.EventStartJob()
 
-	//if debug flag enabled
-	ShowDebuginfo(jobContext.Debug,jobContext)
-	ShowDebuginfo(jobContext.Debug,jobContext.JobData)
+	//log some debuf info if in debug mode
+	Debug(jobContext.Debug,jobContext)
+	Debug(jobContext.Debug,jobContext.JobData)
 
 	//store start time- for reporting purposes
 	jobContext.JobData.StartTime = time.Now()
@@ -221,7 +223,7 @@ func (this *SessionController) Exec(jobContext JobContext) {
 	//all deffered functions
 	defer func() {
 		if err := recover(); err != nil {
-			ShowDebuginfo(jobContext.Debug,fmt.Sprintf("panic %s\n",err))
+			Debugf(jobContext.Debug,"panic %s\n",err)
 			jobContext.JobData.Error = true
 			//jobData.ErrorMsg=err.Error()
 		}
@@ -232,8 +234,8 @@ func (this *SessionController) Exec(jobContext JobContext) {
 		//notify producer that another job has finished
 		jobContext.JobDataChannel <- jobContext.JobData
 		//
-		ShowDebuginfo(jobContext.Debug,jobContext)
-		ShowDebuginfo(jobContext.Debug,jobContext.JobData)
+		Debug(jobContext.Debug,jobContext)
+		Debug(jobContext.Debug,jobContext.JobData)
 		//monitor-finish job
 		jobContext.EventStopTJob()
 	}()
@@ -241,28 +243,28 @@ func (this *SessionController) Exec(jobContext JobContext) {
 	//how to use connection pool?
 	db, err := sql.Open("mysql", jobContext.Dsn)
 	if err != nil {
-		ShowDebuginfo(jobContext.Debug,err)
+		Debug(jobContext.Debug,err)
 		panic(err)
 	}
 	defer db.Close()
 	//log.Print("connection open ", Dsn)
 
-	if len(jobContext.SessionParams) > 0 {
-		_, err = db.Exec(jobContext.SessionParams)
-	}
-
-	if err != nil {
-		ShowDebuginfo(jobContext.Debug,err)
-		panic(err)
+	//iterate all 'set'
+	for _,stmt:=range jobContext.SessionParams{
+		_, err := db.Exec(stmt)
+		if err != nil {
+			Debug(jobContext.Debug,err)
+			panic(err)
+		}
+		Debugf(jobContext.Debug,"pre-exec: %s",stmt)
 	}
 
 	var result sql.Result
 	//all data source details should be well encapsulated
 	result, err = db.Exec(jobContext.JobData.Query)
 
-
 	if err != nil {
-		ShowDebuginfo(jobContext.Debug,err)
+		Debug(jobContext.Debug,err)
 		panic(err)
 	}
 	var rowsAffected int64
@@ -271,12 +273,16 @@ func (this *SessionController) Exec(jobContext JobContext) {
 		totalRowsAffected+=uint64(rowsAffected)
 	}
 
-	ShowDebuginfo(jobContext.Debug,fmt.Sprintf("query %s \n",jobContext.JobData.Query))
-	ShowDebuginfo(jobContext.Debug,fmt.Sprintf("rows affected: %d\n",rowsAffected))
-	ShowDebuginfo(jobContext.Debug,fmt.Sprintf("total rows affected: %d\n",totalRowsAffected))
+	Debugf(jobContext.Debug,"exec query %s \n",jobContext.JobData.Query)
+	Debugf(jobContext.Debug,"rows affected: %d\n",rowsAffected)
+	Debugf(jobContext.Debug,"total rows affected: %d\n",totalRowsAffected)
 }
 
-func ShowDebuginfo(b bool, v interface{}){
+func Debugf(b bool, format string,args ...interface{}){
+	Debug(b,fmt.Sprintf(format,args))
+}
+
+func Debug(b bool, v interface{}){
 	const (DebugLiteral="debug")
 	defer func(){
 		recover()
