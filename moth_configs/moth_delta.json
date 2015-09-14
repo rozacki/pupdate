@@ -10,8 +10,8 @@
       "Name": "update existing makes",
       "Description":"updates all existsing based on id makes regardless of last_updated_on",
       "SessionParam": "",
-      "Dsn": "root:root@tcp(dockerhost:32768)/MOT 2_2",
-      "Exec": "update MOTH3.vehiclemanufacturer mm left join make m on mm.id=m.id set mm.name=m.name where m.last_updated_on;",
+      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+      "Exec": "update MOTH3.vehiclemanufacturer mm left join make m on mm.id=m.id set mm.name=m.name",
       "MaxAttempts": 3,
       "Debug":false
     },
@@ -58,13 +58,21 @@
   ,
     {
       "Name": "add new vehicles",
-      "Description":"adds new vehicles that have appeard in mot2 since last etl: last_updated_on>etl_timestamp",
-      "SessionParam": "",
+      "Description": "uadd new vehiclese",
       "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
-      "Exec": "insert into MOTH3.vehicle (id,make_id,....) select v.id, v.make_id... from vehicle left outer join MOTH.vehicle on vehicle.id=MOTH3.vehicle.id where MOTH.vehicle.id is null and vehicle.last_iupdated_on>tlast_etl;",
+      "ExecTab": ["insert into MOTH3.vehicle",
+        " (id, manufacturer_id,registration, model, vin, dateFirstUsed, fuelType, colour, wheelPlan, v5cReference, approvalType)",
+        " select v.id, v.make_id, v.registration, model.name, v.vin, v.first_used_date, f.name fuel_type, c.name colour, w.name wheel_plan, v5c.v5c_ref, 'approval_type'",
+        " from vehicle as v left join MOTH3.vehicle hv on hv.id=v.id",
+        " left join fuel_type as f on v.fuel_type_id=f.id",
+        " left join colour_lookup as c on v.primary_colour_id=c.id",
+        " left join wheelplan_type as w on v.wheelplan_type_id=w.id",
+        " left join vehicle_v5c as v5c on v.id=v5c.vehicle_id",
+        " left join make as make on v.make_id=make.id",
+        " left join model as model on v.model_id=model.id",
+        " where hv.id is null and v5c.last_seen is null;"],
       "MaxAttempts": 3,
-      "Debug":false,
-      "Disabled":false
+      "Debug": true
     }
   ]
 }

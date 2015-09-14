@@ -21,6 +21,8 @@ type TaskConfiguration struct {
 	Concurrency uint64
 	//one of many possible parameters of session
 	SessionParam string
+	//one of many possible parameters of session
+	SessionParamTab []string
 	//name of method to run. currenlty supported: SQLUpdate,TestSQL. Default is SQLUpdate
 	Method string
 	//How many attempts before job is dropped
