@@ -27,7 +27,7 @@ type TaskConfiguration struct {
 	MaxAttempts uint64
 	//
 	Disabled bool
-	//
+	//Allows to debug individual tasks. This flag is inherited by JonContext.
 	Debug bool
 //**************** dynamic parameters
 	//current session id
@@ -49,8 +49,10 @@ func (this* TaskConfiguration) Trace(data interface{})(*MonitoringError){
 }
 //does some housekeeping int he task configuration, shoudl be called after configuration is loaded
 func (this* TaskConfiguration) Init() error{
-	//join ExecTab into Exec if Exec is emopty and ExecTab is not
-	this.Exec=strings.Join(this.ExecTab,"")
-	//fmt.Println(this.Exec)
+	if len(this.ExecTab)>0{
+		//join ExecTab into Exec if Exec is emopty and ExecTab is not
+		this.Exec=strings.Join(this.ExecTab,"")
+		//fmt.Println(this.Exec)
+	}
 	return nil
 }

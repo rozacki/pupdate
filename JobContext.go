@@ -5,7 +5,10 @@ type JobContext struct{
 	Dsn string
 	SessionParams string
 	JobDataChannel chan *JobData
+	//inherited from Task
 	Debug bool
+	//how many rows have been affected based on what driver returns
+	RowsAffected uint64
 }
 
 //TaskConfiguration extands existing MonitoringModule

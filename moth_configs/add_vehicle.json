@@ -9,9 +9,7 @@
     {
       "Name": "add new vehicles",
       "Description": "uadd new vehiclese",
-      "SessionParam": "",
       "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
-      "Exec":"",
       "ExecTab": ["insert into MOTH3.vehicle",
       " (id, manufacturer_id,registration, model, vin, dateFirstUsed, fuelType, colour, wheelPlan, v5cReference, approvalType)",
       " select v.id, v.make_id, v.registration, model.name, v.vin, v.first_used_date, f.name fuel_type, c.name colour, w.name wheel_plan, v5c.v5c_ref, 'approval_type'",
@@ -22,7 +20,7 @@
         " left join vehicle_v5c as v5c on v.id=v5c.vehicle_id",
         " left join make as make on v.make_id=make.id",
         " left join model as model on v.model_id=model.id",
-        " where hv.id is null and v5c.last_seen is  null;"],
+        " where hv.id is null and v5c.last_seen is null;"],
       "MaxAttempts": 3,
       "Debug": true
     }

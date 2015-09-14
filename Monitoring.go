@@ -28,11 +28,13 @@ const(
 	//this is how it is presented to SQL, daily granularity
 	LastEtlFileFormat	  =	"2006-01-02"
 	//last etl variable name used in sql staements
+	//todo: change name into last_success_session
 	LastEtlVariableName		="$last_etl"
 )
 
 //Monitoring module
-//todo:
+//todo:use standard logger. and its API. Std logger gives you a way to controll file handler. Srd logger is thread safe (thanks to io.Writer?)
+//automatically call notifier for critical issues or starting and stopping session
 type MonitoringModule struct{
 	Configuration MonitoringConfiguration
 	File *os.File
@@ -77,7 +79,7 @@ func (this*MonitoringModule) Trace(sid string,taskName string,tid uint64,jid uin
 
 func (this*MonitoringModule) TraceOK(sid string,taskName string,tid uint64,jid uint64,event string,data interface{}, ok bool)(*MonitoringError){
 	if len(sid)==0{
-		this.log("missing session id")
+		this.Printf("missing session id")
 		return nil
 	}
 	Event:=struct{
@@ -98,10 +100,10 @@ func (this*MonitoringModule) TraceOK(sid string,taskName string,tid uint64,jid u
 		//if file is not open and does exist then fmt.Println() and return
 		this.FileName=filepath.Join(SessionLogFolder,sid+SessionLogFileExt)
 		if this.File,err=os.OpenFile(this.FileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY| os.O_EXCL, 0600);err!=nil{
-			this.log("error '%s' during creating session file '%s' ",err.Error(), this.FileName)
+			this.Printf("error '%s' during creating session file '%s' ",err.Error(), this.FileName)
 			return nil
 		}
-		this.log("session file '%s' created",this.FileName)
+		this.Printf("session file '%s' created",this.FileName)
 	}
 
 	s:= fmt.Sprintf("\n %+v \n",Event)
@@ -112,19 +114,19 @@ func (this*MonitoringModule) TraceOK(sid string,taskName string,tid uint64,jid u
 	//if event=="StopSession" then write event, close the file and change the name
 	if event==StopSession{
 		this.File.Close()
-		this.log("session log closed")
+		this.Printf("session log closed")
 		if ok{
 			os.Rename(this.FileName,filepath.Join(SessionLogFolder,sid+DatSessionLogFileExt))
-			this.log("session log renamed")
+			this.Printf("session log renamed")
 		}
 	}
 
 	return nil
 }
-func (this*MonitoringModule)log(format string,args... string){
+func (this*MonitoringModule)Printf(format string,args... string){
 	fmt.Printf("monitoring:"+format+"\n",args)
 }
-//Depeneding on configuration we can support db monitoring.
+// Depending on configuration we can support db monitoring.
 // Currently we suport only log-based monitoring
 type MonitoringConfiguration struct{
 	Dsn string
@@ -139,7 +141,7 @@ func makeMonitoring(configuration MonitoringConfiguration)(Monitor){
 	return &MonitoringModule{Configuration:configuration}
 }
 
-//specific interface for monitoring tasks
+//specific interface for monitoring sessions, tasks, jobs. It wraps logger api into a number of domain specific methods.
 type Monitor interface{
 	//generic method
 	Trace(sid string,taskName string,tid uint64,jid uint64,event string,data interface{})(*MonitoringError)
@@ -159,7 +161,7 @@ func findLastEtlTime() (time.Time,error) {
 		_,fileName:=filepath.Split(filePath)
 		//strip extension
 		fileName=strings.TrimSuffix(fileName,filepath.Ext(fileName))
-		fmt.Println(fileName)
+		//parse the name of the file according to SessionFileFormat
 		time, err := time.Parse(SessionFileFormat, fileName)
 		if err!=nil {
 			continue

@@ -5,6 +5,8 @@ import(
 	"time"
 	_ "github.com/go-sql-driver/mysql"
 	"database/sql"
+	"strings"
+	_"os"
 )
 
 type SessionController struct {
@@ -43,10 +45,10 @@ func (this *SessionController) StartTasks() {
 		taskData:=this.startTask(task,this.Configuration.Done)
 		//
 		//Monitoring
-		//todo:check success MaxAttemptJobsDropped==0
 		if taskData.MaxAttemptJobsDropped>0{
 			//we record it
 			this.Configuration.Trace(fmt.Sprintf("session failed: '%s'. Task details %+v",taskData.LastDroppedJob.LastErrorMsg,taskData))
+			//todo: SessionContext should provide monitoring interface
 			this.Configuration.SessionFail()
 			return
 		}
@@ -56,7 +58,7 @@ func (this *SessionController) StartTasks() {
 			fmt.Printf("task failed:%n",)
 		}
 		*/
-		//should I finish
+		//should I finish’
 		select{
 		//global flag to finish processing. it is used by main thread and allow user to signal termination
 		case <-this.Configuration.Done:
@@ -92,7 +94,7 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 		//record that fact
 		configuration.EventStopTask()
 		//last serialisation
-		SerialiseStruct(taskData)
+		SerialiseStruct(this.Configuration)
 		//close task<-job comm channel
 		close(jobDataChannel)
 		//
@@ -148,10 +150,12 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 			//if current job is empty then we create new job
 			if jobData == nil {
 				var Query string	=	configuration.Exec
-				//if partitioning enabled
+				//if partitioning enabled then format SQL string to provide Min and Max
 				if JobsCount>1{
 					Query=fmt.Sprintf(configuration.Exec, taskData.DataCursor, taskData.DataCursor + taskData.TaskConfiguration.Step)
 				}
+				//try to resolve $LastEtl to date time
+				Query=strings.Replace(Query,LastEtlVariableName,LastEtl.Format(SessionFileFormat),-1)
 				//store only data that is requred and specifc for job
 				jobData = &JobData{Id: taskData.JobId, Query: Query}
 				//move cursor to the next step
@@ -190,7 +194,7 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 		}
 		//if last serialisation happend more than...
 		if time.Now().Sub(taskData.Serialised) > (1 * time.Second) {
-			SerialiseStruct(taskData)
+			SerialiseStruct(this.Configuration)
 			taskData.Serialised = time.Now()
 		}
 	}
@@ -203,15 +207,21 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 //todo: implement queryrow - that returns at most one row
 //Exec executes a query without returning any rows
 func (this *SessionController) Exec(jobContext JobContext) {
+	var totalRowsAffected uint64
 	//monitoring-start job
 	jobContext.EventStartJob()
+
+	//if debug flag enabled
 	ShowDebuginfo(jobContext.Debug,jobContext)
 	ShowDebuginfo(jobContext.Debug,jobContext.JobData)
-	//store start time
+
+	//store start time- for reporting purposes
 	jobContext.JobData.StartTime = time.Now()
+
+	//all deffered functions
 	defer func() {
 		if err := recover(); err != nil {
-			//log.Println(err)
+			ShowDebuginfo(jobContext.Debug,fmt.Sprintf("panic %s\n",err))
 			jobContext.JobData.Error = true
 			//jobData.ErrorMsg=err.Error()
 		}
@@ -246,25 +256,39 @@ func (this *SessionController) Exec(jobContext JobContext) {
 		panic(err)
 	}
 
-	fmt.Println(jobContext.JobData.Query)
+	var result sql.Result
 	//all data source details should be well encapsulated
-	_, err = db.Exec(jobContext.JobData.Query)
+	result, err = db.Exec(jobContext.JobData.Query)
 
-	//log.Print("query finished:", query)
 
 	if err != nil {
 		ShowDebuginfo(jobContext.Debug,err)
 		panic(err)
 	}
+	var rowsAffected int64
+	//if diriver supports rows affected and last inserted id
+	if rowsAffected,err:=result.RowsAffected();err==nil{
+		totalRowsAffected+=uint64(rowsAffected)
+	}
 
-	//fmt.Printf("end: job_id=%d,start_id=%d stop_id=%d\n",jobId, startid, limit)
+	ShowDebuginfo(jobContext.Debug,fmt.Sprintf("query %s \n",jobContext.JobData.Query))
+	ShowDebuginfo(jobContext.Debug,fmt.Sprintf("rows affected: %d\n",rowsAffected))
+	ShowDebuginfo(jobContext.Debug,fmt.Sprintf("total rows affected: %d\n",totalRowsAffected))
 }
 
 func ShowDebuginfo(b bool, v interface{}){
+	const (DebugLiteral="debug")
 	defer func(){
 		recover()
 	}()
 	if b{
-		fmt.Printf("%#v\n",v)
+		switch t:=v.(type){
+			case string: fmt.Print(DebugLiteral+":"+t)
+			default:fmt.Printf(DebugLiteral+":%#v\n", t)
 	}
+	}
+}
+
+func (this*SessionController) Fatalf(format string, v ...interface{}){
+
 }

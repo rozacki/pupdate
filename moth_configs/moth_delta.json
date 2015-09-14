@@ -25,14 +25,35 @@
       "Debug":false
     },
     {
-      "Name": "update existing makes",
-      "Description":"updates all existsing vehicles based on id makes regardless of last_updated_on",
-      "SessionParam": "",
-      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
-      "Exec": "update MOTH3.vehicle vh left join vehicle v on vh.id=v.id set vh.registration=v.registration where v.last_updated_on>'$LastEtl';",
+      "Name": "update vehicles",
+      "Description":"updates all vehicles which have changed since",
+
+      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2","SessionParam": "",
+      "Exec": "select * from mot_test where last_updated_on>'$last_etl';",
+      "ExecTab":[
+        "update MOTH3.vehicle hv ",
+        "inner join vehicle v on hv.id=v.id ",
+        "left join fuel_type as f on v.fuel_type_id=f.id ",
+        "left join colour_lookup as c on v.primary_colour_id=c.id ",
+        "left join wheelplan_type as w on v.wheelplan_type_id=w.id ",
+        "left join vehicle_v5c as v5c on v.id=v5c.vehicle_id ",
+        "left join make as make on v.make_id=make.id ",
+        "left join model as model on v.model_id=model.id ",
+        "set  manufacturer_id=v.make_id ",
+        ",hv.registration=v.registration ",
+        ",hv.model=model.name ",
+        ",hv.vin=v.vin ",
+        ",hv.dateFirstUsed=v.first_used_date ",
+        ",hv.fuelType=f.name ",
+        ",hv.colour=c.name ",
+        ",hv.wheelPlan=w.name ",
+        ",hv.v5cReference=v5c.v5c_ref ",
+        ",hv.approvalType=''",
+        " where v5c.last_seen is  null",
+        " and v.last_updated_on>'$last_etl'"
+      ],
       "MaxAttempts": 3,
-      "Debug":false,
-      "Disabled":false
+      "Debug":true
     }
   ,
     {

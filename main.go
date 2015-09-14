@@ -35,31 +35,27 @@ const (
 var Notifier *NotificationsModule
 //global module for recording session,task, job progress
 var Monitoring Monitor
-//last etl
+//last sucessfull etl
+//todo: change name to something more generic. move it to session context when available
 var LastEtl	time.Time
 
 func main() {
-
-	//LastEtl,_:=time.Parse(SessionFileFormat,"2015-01-02 15:04:05")
-	//fmt.Println(LastEtl.Format(LastEtlFileFormat))
-	//os.Exit(1)
-
+	//parse parameter
 	var configFileName = flag.String("config", "", "configuration file")
 	flag.Parse()
 
 	if len(*configFileName) == 0 {
-		fmt.Print(*configFileName)
-		fmt.Println("missing configuration (-config parameter) file path")
-		os.Exit(1)
+		usage()
 	}
 
 	//if file is corrupted then we get nil
-	//if types dont match then we get zero value for that structure
+	//if types dont match then we get zero value for that SessionConguration
 	configuration := loadSessionConfiguration(*configFileName)
 	if configuration == nil {
 		fmt.Println("configuration load error")
 		os.Exit(1)
 	}
+	Printf("Configuration loaded. Found %d tasks\n", len(configuration.Tasks))
 
 	if Monitoring=makeMonitoring(configuration.Monitoring);Monitoring==nil{
 		os.Exit(1)
@@ -67,16 +63,12 @@ func main() {
 
 	//find last_elt timestamp
 	if lastEtl,err:=findLastEtlTime(); err!=nil{
-		logMsg("error finding $LastEtl:%s\n", err)
+		Printf("error finding $LastEtl:%s\n", err)
 		os.Exit(1)
 	}else{
 		LastEtl=lastEtl
+		Printf("$LastEtl = %s\n",LastEtl.Format(LastEtlFileFormat))
 	}
-	//logMsg("$LastEtl = %s\n",LastEtl.Format(LastEtlFileFormat))
-
-	//logMsg(strings.Replace("select * from mot_test where last_updated_on>'$LastEtl';",LastEtlVarName,LastEtl.Format(LastEtlFileFormat),-1 ))
-
-	logMsg("Configuration loaded. Found %d tasks\n", len(configuration.Tasks))
 
 	configuration.SessionID	=	time.Now().Format(SessionFileFormat)
 	configuration.Done		=	make(chan struct{})
@@ -87,6 +79,7 @@ func main() {
 	}
 
 	sessionController.StartTasks()
+	//it will terminate session
 	close(configuration.Done)
 
 	/*
@@ -141,6 +134,13 @@ func SerialiseStruct(v interface{}) {
 	//owner=read+wqrite, group and others=read
 	ioutil.WriteFile(DefaultStatusFileName, bytes, 0644)
 }
-func logMsg(format string,args... interface{}){
+func Printf(format string,args... interface{}){
 	fmt.Printf("main:"+format+"\n",args)
+}
+
+func usage(){
+	fmt.Println("Data integration tool")
+	fmt.Println("Usage:")
+	fmt.Println("pupdate -config=monitoring/configuration_file")
+	os.Exit(1)
 }

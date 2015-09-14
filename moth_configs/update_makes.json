@@ -10,7 +10,7 @@
     "Description":"creates new vehicle in moth.vehicle database if does not exist in moth",
     "SessionParam": "",
     "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
-    "Exec": "update MOTH3.vehiclemanufacturer mm left join make m on mm.id=m.id set mm.name=m.name where m.last_updated_on;",
+    "Exec": "update MOTH3.vehiclemanufacturer mm left join make m on mm.id=m.id set mm.name=m.name;",
     "MaxAttempts": 3,
     "Debug":true
   }]
