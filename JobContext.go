@@ -3,7 +3,7 @@ package main
 type JobContext struct{
 	JobData *JobData
 	Dsn string
-	SessionParams []string
+	PreSteps []string
 	JobDataChannel chan *JobData
 	//inherited from Task
 	Debug bool

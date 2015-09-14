@@ -27,8 +27,8 @@
     {
       "Name": "update vehicles",
       "Description":"updates all vehicles which have changed since",
-
-      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2","SessionParam": "",
+      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+      "SessionParam": "",
       "Exec": "select * from mot_test where last_updated_on>'$last_etl';",
       "ExecTab":[
         "update MOTH3.vehicle hv ",
@@ -53,7 +53,7 @@
         " and v.last_updated_on>'$last_etl'"
       ],
       "MaxAttempts": 3,
-      "Debug":true
+      "Debug":false
     }
   ,
     {
@@ -74,12 +74,35 @@
       "MaxAttempts": 3,
       "Debug": true
     }
+    ,
+    {
+      "Name": "update tests",
+      "Description":"updeate tests into moth.vehicle database if they exists",
+      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+      "SessionParamTab":["set foreign_key_checks=0"],
+      "ExecTab": [
+        "update MOTH3.testresult ht ",
+        "inner join mot_test t on ht.id=t.id ",
+        "LEFT OUTER JOIN odometer_reading r ON r.id = t.odometer_reading_id ",
+        "left JOIN site s ON t.site_id = s.id ",
+        "LEFT OUTER JOIN site_contact_detail_map sm ON sm.site_id = s.id ",
+        "LEFT OUTER  JOIN phone p ON sm.contact_detail_id = p.contact_detail_id AND p.is_primary = 1 ",
+        "set ",
+        "ht.id=t.id,ht.vehicle_id=t.vehicle_id,ht.testDate=date(t.started_date) ,expiryDate=t.expiry_date, mileage=r.value ,",
+        "mileageUnit=r.unit ,testNumber=t.number ,pass=t.status_id ,reasonForFailure='reasons for failure divided with new line' ,",
+        "advisoryNotice='advisory notice divided with new line' ,",
+        "vt20Reference=case when t.status_id=6 then t.number else '' end ,vt30Reference=case when t.status_id=5 then t.number else '' end ,",
+        "testStationName=s.name ,testStationNumber=s.site_number ,testStationPhoneNumber=p.number "
+      ],
+      "MaxAttempts": 3,
+      "Debug":false
+    }
   ,
     {
       "Name": "add tests",
       "Description":"add tests into moth.vehicle database if does not exist",
       "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
-      "SessionParamTab":["set foreign_key_checks=0"],
+      "PreSteps":["set foreign_key_checks=0"],
       "ExecTab": [
         "insert into MOTH3.testresult ",
         "(`id`,`vehicle_id`,`testDate` ,`expiryDate` ,`mileage` ,`mileageUnit` ,`testNumber` ,`pass` ,`reasonForFailure` ,`advisoryNotice` ,`vt20Reference` ,`vt30Reference` ,`testStationName` ,`testStationNumber` ,`testStationPhoneNumber`) ",

@@ -166,7 +166,7 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 
 			jobContext:=	JobContext{JobData:jobData,
 				Dsn:configuration.Dsn,
-				SessionParams:configuration.SessionParam,
+				PreSteps:configuration.PreSteps,
 				JobDataChannel:jobDataChannel,
 				Debug:configuration.Debug}
 			Debug(configuration.Debug,jobContext)
@@ -224,8 +224,8 @@ func (this *SessionController) Exec(jobContext JobContext) {
 	defer func() {
 		if err := recover(); err != nil {
 			Debugf(jobContext.Debug,"panic %s\n",err)
-			jobContext.JobData.Error = true
-			//jobData.ErrorMsg=err.Error()
+			jobContext.JobData.Error 		= 	true
+			jobContext.JobData.LastErrorMsg	=	fmt.Sprintf("%s",err)
 		}
 		//increase number of attmpts
 		jobContext.JobData.Attempts++
@@ -246,11 +246,12 @@ func (this *SessionController) Exec(jobContext JobContext) {
 		Debug(jobContext.Debug,err)
 		panic(err)
 	}
+	//close connection hence no side effects
 	defer db.Close()
 	//log.Print("connection open ", Dsn)
 
 	//iterate all 'set'
-	for _,stmt:=range jobContext.SessionParams{
+	for _,stmt:=range jobContext.PreSteps {
 		_, err := db.Exec(stmt)
 		if err != nil {
 			Debug(jobContext.Debug,err)

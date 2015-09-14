@@ -19,7 +19,7 @@ type TaskConfiguration struct {
 	Step        uint64
 	Concurrency uint64
 	//one of many possible parameters of session
-	SessionParam []string
+	PreSteps []string
 	//one of many possible parameters of session
 	SessionParamTab []string
 	//name of method to run. currenlty supported: SQLUpdate,TestSQL. Default is SQLUpdate
