@@ -1,0 +1,7 @@
+ {Ev:StartSession SID:2015-09-13 21:25:06 TaskName: TID:0 JID:0 Data:0xc82001a300}
+
+ {Ev:StartTask SID:2015-09-13 21:25:06 TaskName:add new vehicles TID:0 JID:0 Data:0xc8200b0000} 
+
+ {Ev:StopTask SID:2015-09-13 21:25:06 TaskName:add new vehicles TID:0 JID:0 Data:0xc8200b0000} 
+
+ {Ev:StopSession SID:2015-09-13 21:25:06 TaskName: TID:0 JID:0 Data:0xc82001a360} 

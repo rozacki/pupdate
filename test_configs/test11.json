@@ -1,0 +1,24 @@
+{
+  "Monitoring":{
+    "Dsn":"root:root@dockerhost:32768/monitoring"
+  },
+  "Notifications":{
+    "Email":"chris.rozacki@valtech.co.uk"
+  },
+  "Tasks":[{
+    "Version-this is software version": "v0.1",
+    "Name": "",
+    "Description":"",
+    "SessionParam": "set session group_concat_max_len=100000",
+    "Dsn": "moth:pass@tcp(localhost:3306)/moth",
+    "Exec": "select * from testresult where id>=%d and id<%d;",
+    "Max": 10,
+    "Min": 0,
+    "Step": 5,
+    "Concurrency": 2,
+    "Method": "TestUpdate",
+    "MaxAttempts": 3,
+    "Debug":false,
+    "-issue descriptin": "gets into infite lopp after first attempt: scheudle first, queue>1,sets status to finishing"
+  }]
+}
