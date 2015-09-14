@@ -38,19 +38,23 @@ var Monitoring Monitor
 //last sucessfull etl
 //todo: change name to something more generic. move it to session context when available
 var LastEtl	time.Time
+//
+var ConfigFileNameFlag	= flag.String("config", "", "configuration file name")
+//
+var TestConfigLoadFlag	= flag.Bool("test_config",false,"test configuration?")
+//var TestConfigLoadFlag bool
 
 func main() {
-	//parse parameter
-	var configFileName = flag.String("config", "", "configuration file")
+	//parse parameters
 	flag.Parse()
 
-	if len(*configFileName) == 0 {
+	if *ConfigFileNameFlag == "" {
 		usage()
 	}
 
 	//if file is corrupted then we get nil
 	//if types dont match then we get zero value for that SessionConguration
-	configuration := loadSessionConfiguration(*configFileName)
+	configuration := loadSessionConfiguration(*ConfigFileNameFlag)
 	if configuration == nil {
 		fmt.Println("configuration load error")
 		os.Exit(1)
@@ -72,6 +76,13 @@ func main() {
 
 	configuration.SessionID	=	time.Now().Format(SessionFileFormat)
 	configuration.Done		=	make(chan struct{})
+
+	//do we test config only?
+	if *TestConfigLoadFlag{
+		fmt.Printf("testing config only\n")
+		os.Exit(0)
+	}
+
 	var sessionController 	*SessionController
 	//start new session
 	if sessionController=	makeSessionController(*configuration);sessionController==nil{
@@ -139,8 +150,9 @@ func Printf(format string,args... interface{}){
 }
 
 func usage(){
-	fmt.Println("Data integration tool")
-	fmt.Println("Usage:")
-	fmt.Println("pupdate -config=monitoring/configuration_file")
+	fmt.Println("\nData integration tool. Usage:")
+	fmt.Println("pupdate -config=monitoring/configuration_file [-test_config]")
+	fmt.Println("-config path to configiration file name")
+	fmt.Println("-test_config whether to test configuration")
 	os.Exit(1)
 }
