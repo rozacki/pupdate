@@ -7,7 +7,6 @@ import(
 )
 
 type TaskConfiguration struct {
-
 	Name   string
 	Dsn    string
 	Exec   string
@@ -20,7 +19,7 @@ type TaskConfiguration struct {
 	Step        uint64
 	Concurrency uint64
 	//one of many possible parameters of session
-	SessionParam string
+	SessionParam []string
 	//one of many possible parameters of session
 	SessionParamTab []string
 	//name of method to run. currenlty supported: SQLUpdate,TestSQL. Default is SQLUpdate
