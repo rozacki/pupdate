@@ -74,5 +74,31 @@
       "MaxAttempts": 3,
       "Debug": true
     }
+  ,
+    {
+      "Name": "add tests",
+      "Description":"add tests into moth.vehicle database if does not exist",
+      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+      "SessionParamTab":["set foreign_key_checks=0"],
+      "ExecTab": [
+        "insert into MOTH3.testresult ",
+        "(`id`,`vehicle_id`,`testDate` ,`expiryDate` ,`mileage` ,`mileageUnit` ,`testNumber` ,`pass` ,`reasonForFailure` ,`advisoryNotice` ,`vt20Reference` ,`vt30Reference` ,`testStationName` ,`testStationNumber` ,`testStationPhoneNumber`) ",
+        "select t.id, t.vehicle_id,date(t.started_date),t.expiry_date,r.value,r.unit,t.number,t.status_id, 'reasons for failure divided with new line', 'advisory notice divided with new line',case when t.status_id=6 then t.number else '' end,case when t.status_id=5 then t.number else '' end, name,s.site_number,p.number ",
+        "from mot_test as t ",
+        "LEFT OUTER JOIN odometer_reading r ",
+        "ON r.id = t.odometer_reading_id ",
+        "left JOIN site s ",
+        "ON t.site_id = s.id ",
+        "LEFT OUTER JOIN site_contact_detail_map sm ",
+        "ON sm.site_id = s.id ",
+        "LEFT OUTER  JOIN phone p ",
+        "ON sm.contact_detail_id = p.contact_detail_id ",
+        "AND p.is_primary = 1 ",
+        "left join MOTH3.testresult ht on ht.id=t.id ",
+        "where ht.id is null"
+      ],
+      "MaxAttempts": 3,
+      "Debug":false
+    }
   ]
 }
