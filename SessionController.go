@@ -164,11 +164,13 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 				taskData.JobId++
 			}
 
-			jobContext:=	JobContext{JobData:jobData,
+			jobContext:=	JobContext{
+				JobData:jobData,
 				Dsn:configuration.Dsn,
 				PreSteps:configuration.PreSteps,
 				JobDataChannel:jobDataChannel,
-				Debug:configuration.Debug}
+				Debug:configuration.Debug,
+				TaskName:configuration.Name}
 			Debug(configuration.Debug,jobContext)
 			//schedule the job
 			//todo: switch case here: Exec, Query, QueryOne

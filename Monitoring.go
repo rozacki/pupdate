@@ -73,24 +73,17 @@ func (this*MonitoringModule) record(msg string)(err error){
 	return nil
 }
 
-func (this*MonitoringModule) Trace(sid string,taskName string,tid uint64,jid uint64,event string,data interface{})(*MonitoringError){
-	return this.TraceOK(sid,taskName ,tid ,jid ,event ,data,false)
+func (this*MonitoringModule) Trace(taskName string,event string)(*MonitoringError){
+	return this.TraceOK(taskName,event,false)
 }
 
-func (this*MonitoringModule) TraceOK(sid string,taskName string,tid uint64,jid uint64,event string,data interface{}, ok bool)(*MonitoringError){
-	if len(sid)==0{
-		this.Printf("missing session id")
-		return nil
-	}
-	Event:=struct{
-		Ev string
-		SID string
+func (this*MonitoringModule) TraceOK(taskName string,event string, ok bool)(*MonitoringError){
+
+	Ev :=struct{
+		Event string
 		TaskName string
-		TID uint64
-		JID uint64
-		Data interface{}
 	}{
-		event,sid ,taskName ,tid ,jid,data,
+		event ,taskName,
 	}
 	var err error
 	//is log file specific for this sesion is open now?
@@ -98,7 +91,7 @@ func (this*MonitoringModule) TraceOK(sid string,taskName string,tid uint64,jid u
 	if this.File==nil{
 		//if file sid file is not open and does not exist then open it
 		//if file is not open and does exist then fmt.Println() and return
-		this.FileName=filepath.Join(SessionLogFolder,sid+SessionLogFileExt)
+		this.FileName=filepath.Join(SessionLogFolder,GSessionId+SessionLogFileExt)
 		if this.File,err=os.OpenFile(this.FileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY| os.O_EXCL, 0600);err!=nil{
 			this.Printf("error '%s' during creating session file '%s' ",err.Error(), this.FileName)
 			return nil
@@ -106,7 +99,7 @@ func (this*MonitoringModule) TraceOK(sid string,taskName string,tid uint64,jid u
 		this.Printf("session file '%s' created",this.FileName)
 	}
 
-	s:= fmt.Sprintf("\n %+v \n",Event)
+	s:= fmt.Sprintf("\n %+v \n", Ev)
 	if _, err = this.File.WriteString(s); err != nil {
 		return nil
 	}
@@ -116,7 +109,7 @@ func (this*MonitoringModule) TraceOK(sid string,taskName string,tid uint64,jid u
 		this.File.Close()
 		this.Printf("session log closed")
 		if ok{
-			os.Rename(this.FileName,filepath.Join(SessionLogFolder,sid+DatSessionLogFileExt))
+			os.Rename(this.FileName,filepath.Join(SessionLogFolder,GSessionId+DatSessionLogFileExt))
 			this.Printf("session log renamed")
 		}
 	}
@@ -144,9 +137,9 @@ func makeMonitoring(configuration MonitoringConfiguration)(Monitor){
 //specific interface for monitoring sessions, tasks, jobs. It wraps logger api into a number of domain specific methods.
 type Monitor interface{
 	//generic method
-	Trace(sid string,taskName string,tid uint64,jid uint64,event string,data interface{})(*MonitoringError)
+	Trace(taskName string,event string,)(*MonitoringError)
 	//generic method thta accespts success ot false
-	TraceOK(sid string,taskName string,tid uint64,jid uint64,event string,data interface{}, ok bool)(*MonitoringError)
+	TraceOK(taskName string,event string, ok bool)(*MonitoringError)
 }
 
 func findLastEtlTime() (time.Time,error) {

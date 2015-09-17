@@ -38,15 +38,15 @@ type TaskConfiguration struct {
 }
 //TaskConfiguration extands existing MonitoringModule
 func (this* TaskConfiguration) EventStartTask()(*MonitoringError){
-	return Monitoring.Trace(this.SessionId,this.Name,this.TaskId,0,StartTask,this)
+	return Monitoring.Trace(this.Name,StartTask)
 }
 
 func (this* TaskConfiguration) EventStopTask()(*MonitoringError){
-	return Monitoring.Trace(this.SessionId,this.Name,this.TaskId,0,StopTask,this)
+	return Monitoring.Trace(this.Name,StopTask)
 }
 
 func (this* TaskConfiguration) Trace(data interface{})(*MonitoringError){
-	return Monitoring.Trace(this.SessionId,this.Name,this.TaskId,0, Trace,data)
+	return Monitoring.Trace(this.Name,Trace)
 }
 //does some housekeeping int he task configuration, shoudl be called after configuration is loaded
 func (this* TaskConfiguration) Init() error{

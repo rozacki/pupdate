@@ -7,31 +7,31 @@
   },
   "Tasks":[
     {
-      "Name": "update existing makes",
-      "Description":"updates all existsing based on id makes regardless of last_updated_on",
+      "Name": "update makes",
+      "Description":"updates all existsing makes regardless of last_updated_on",
       "SessionParam": "",
-      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
-      "Exec": "update MOTH3.vehiclemanufacturer mm left join make m on mm.id=m.id set mm.name=m.name",
+      "Dsn": "moth:pass@tcp(localhost)/mot_v195_rel4_copy",
+      "Exec": "update moth_copy.vehiclemanufacturer mm left join make m on mm.id=m.id set mm.name=m.name",
       "MaxAttempts": 3,
       "Debug":false
     },
     {
-      "Name": "add new makes",
-      "Description":"creates new vehicle in moth.vehicle database if does not exist in moth",
+      "Name": "insert makes",
+      "Description":"insert all makes that don't exist in vehiclemanufacturer",
       "SessionParam": "",
-      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
-      "Exec": "insert into MOTH3.vehiclemanufacturer (id, name) select make.id, make.name from make left outer join MOTH3.vehiclemanufacturer on make.id=MOTH3.vehiclemanufacturer.id where MOTH3.vehiclemanufacturer.id is NULL;",
+      "Dsn": "moth:pass@tcp(localhost)/mot_v195_rel4_copy",
+      "Exec": "insert into moth_copy.vehiclemanufacturer (id, name) select make.id, make.name from make left outer join moth_copy.vehiclemanufacturer on make.id=moth_copy.vehiclemanufacturer.id where moth_copy.vehiclemanufacturer.id is NULL;",
       "MaxAttempts": 3,
       "Debug":false
     },
     {
       "Name": "update vehicles",
-      "Description":"updates all vehicles which have changed since",
-      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+      "Description":"updates all vehicles which have changed since last etl",
+      "Dsn": "moth:pass@tcp(localhost)/mot_v195_rel4_copy",
       "SessionParam": "",
       "Exec": "select * from mot_test where last_updated_on>'$last_etl';",
       "ExecTab":[
-        "update MOTH3.vehicle hv ",
+        "update moth_copy.vehicle hv ",
         "inner join vehicle v on hv.id=v.id ",
         "left join fuel_type as f on v.fuel_type_id=f.id ",
         "left join colour_lookup as c on v.primary_colour_id=c.id ",
@@ -57,13 +57,13 @@
     }
   ,
     {
-      "Name": "add new vehicles",
-      "Description": "uadd new vehiclese",
-      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
-      "ExecTab": ["insert into MOTH3.vehicle",
+      "Name": "insert vehicles",
+      "Description": "insert vehicles that don't exist in moth.vehicle",
+      "Dsn": "moth:pass@tcp(localhost)/mot_v195_rel4_copy",
+      "ExecTab": ["insert into moth_copy.vehicle",
         " (id, manufacturer_id,registration, model, vin, dateFirstUsed, fuelType, colour, wheelPlan, v5cReference, approvalType)",
         " select v.id, v.make_id, v.registration, model.name, v.vin, v.first_used_date, f.name fuel_type, c.name colour, w.name wheel_plan, v5c.v5c_ref, 'approval_type'",
-        " from vehicle as v left join MOTH3.vehicle hv on hv.id=v.id",
+        " from vehicle as v left join moth_copy.vehicle hv on hv.id=v.id",
         " left join fuel_type as f on v.fuel_type_id=f.id",
         " left join colour_lookup as c on v.primary_colour_id=c.id",
         " left join wheelplan_type as w on v.wheelplan_type_id=w.id",
@@ -72,16 +72,16 @@
         " left join model as model on v.model_id=model.id",
         " where hv.id is null and v5c.last_seen is null;"],
       "MaxAttempts": 3,
-      "Debug": true
+      "Debug": false
     }
     ,
     {
       "Name": "update tests",
-      "Description":"updeate tests into moth.vehicle database if they exists",
-      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+      "Description":"update tests that changed since last etl",
+      "Dsn": "moth:pass@tcp(localhost)/mot_v195_rel4_copy",
       "SessionParamTab":["set foreign_key_checks=0"],
       "ExecTab": [
-        "update MOTH3.testresult ht ",
+        "update moth_copy.testresult ht ",
         "inner join mot_test t on ht.id=t.id ",
         "LEFT OUTER JOIN odometer_reading r ON r.id = t.odometer_reading_id ",
         "left JOIN site s ON t.site_id = s.id ",
@@ -99,12 +99,12 @@
     }
   ,
     {
-      "Name": "add tests",
-      "Description":"add tests into moth.vehicle database if does not exist",
-      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+      "Name": "insert tests",
+      "Description":"insert tests that don't exist on moth.testresult",
+      "Dsn": "moth:pass@tcp(localhost)/mot_v195_rel4_copy",
       "PreSteps":["set foreign_key_checks=0"],
       "ExecTab": [
-        "insert into MOTH3.testresult ",
+        "insert into moth_copy.testresult ",
         "(`id`,`vehicle_id`,`testDate` ,`expiryDate` ,`mileage` ,`mileageUnit` ,`testNumber` ,`pass` ,`reasonForFailure` ,`advisoryNotice` ,`vt20Reference` ,`vt30Reference` ,`testStationName` ,`testStationNumber` ,`testStationPhoneNumber`) ",
         "select t.id, t.vehicle_id,date(t.started_date),t.expiry_date,r.value,r.unit,t.number,t.status_id, 'reasons for failure divided with new line', 'advisory notice divided with new line',case when t.status_id=6 then t.number else '' end,case when t.status_id=5 then t.number else '' end, name,s.site_number,p.number ",
         "from mot_test as t ",
@@ -117,11 +117,57 @@
         "LEFT OUTER  JOIN phone p ",
         "ON sm.contact_detail_id = p.contact_detail_id ",
         "AND p.is_primary = 1 ",
-        "left join MOTH3.testresult ht on ht.id=t.id ",
+        "left join moth_copy.testresult ht on ht.id=t.id ",
         "where ht.id is null"
       ],
       "MaxAttempts": 3,
       "Debug":false
+    },{
+      "Name": "update rfr",
+      "Description": "updates rfr if mot_test.last_updated_on>last etl",
+      "Dsn": "moth:pass@tcp(localhost)/mot_v195_rel4_copy",
+      "ExecTab": [
+        "update moth_copy.testresult as ht ",
+        "set ht.reasonForFailure=",
+        "ifnull((SELECT group_concat(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(COALESCE(map.location_lateral,''), ' ',",
+        "COALESCE(map.location_longitudinal,''))),' ',COALESCE(map.location_vertical,''))),' ',COALESCE(timap.description, ''))),' ',",
+        "COALESCE(rfrl.name,''))),' ', COALESCE(map.`comment` ,''))),CASE WHEN rfr.inspection_manual_reference ",
+        "IS NOT NULL THEN CONCAT( ' (', rfr.inspection_manual_reference, ')') ELSE ' ' END)) SEPARATOR ',\n') reason_for_refusal ",
+        "FROM mot_test t ",
+        "left join mot_test_rfr_map map on t.id=map.mot_test_id ",
+        "left JOIN language_type l ON l.code='EN' ",
+        "LEFT OUTER JOIN reason_for_rejection rfr ON map.rfr_id=rfr.id ",
+        "LEFT OUTER JOIN rfr_language_content_map rfrl ON rfrl.rfr_id=rfr.id AND rfrl.language_type_id = l.id ",
+        "LEFT OUTER JOIN test_item_category ti ON rfr.test_item_category_id=ti.id ",
+        "LEFT OUTER JOIN ti_category_language_content_map timap ON timap.test_item_category_id = rfr.test_item_category_id ",
+        "AND timap.language_lookup_id = l.id ",
+        "where  ht.id=t.id and t.last_updated_on>'$last_etl' and map.type in ('FAIL')),'')"
+      ],
+      "MaxAttempts": 3,
+      "Debug": true
+    },{
+      "Name": "update advice",
+      "Description": "updates advice if mot_test.last_updated_on>last etl",
+      "Dsn": "moth:pass@tcp(localhost)/mot_v195_rel4_copy",
+      "ExecTab": [
+        "update moth_copy.testresult as ht ",
+        "set ht.advisoryNotice=",
+        "ifnull((SELECT group_concat(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(COALESCE(map.location_lateral,''), ' ',",
+        "COALESCE(map.location_longitudinal,''))),' ',COALESCE(map.location_vertical,''))),' ',COALESCE(timap.description, ''))),' ',",
+        "COALESCE(rfrl.name,''))),' ', COALESCE(map.`comment` ,''))),CASE WHEN rfr.inspection_manual_reference ",
+        "IS NOT NULL THEN CONCAT( ' (', rfr.inspection_manual_reference, ')') ELSE ' ' END)) SEPARATOR ',\n') advice ",
+        "FROM mot_test t ",
+        "left join mot_test_rfr_map map on t.id=map.mot_test_id ",
+        "left JOIN language_type l ON l.code='EN' ",
+        "LEFT OUTER JOIN reason_for_rejection rfr ON map.rfr_id=rfr.id ",
+        "LEFT OUTER JOIN rfr_language_content_map rfrl ON rfrl.rfr_id=rfr.id AND rfrl.language_type_id = l.id ",
+        "LEFT OUTER JOIN test_item_category ti ON rfr.test_item_category_id=ti.id ",
+        "LEFT OUTER JOIN ti_category_language_content_map timap ON timap.test_item_category_id = rfr.test_item_category_id ",
+        "AND timap.language_lookup_id = l.id ",
+        "where  ht.id=t.id and t.last_updated_on>'$last_etl' and map.type not in ('FAIL')),'')"
+      ],
+      "MaxAttempts": 3,
+      "Debug": true
     }
   ]
 }

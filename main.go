@@ -30,19 +30,22 @@ const (
 	//must be exact match
 	LastEtlVarName			="$LastEtl"
 )
-
-//will be used to notify users about some important facts
-var Notifier *NotificationsModule
-//global module for recording session,task, job progress
-var Monitoring Monitor
-//last sucessfull etl
-//todo: change name to something more generic. move it to session context when available
-var LastEtl	time.Time
-//
-var ConfigFileNameFlag	= flag.String("config", "", "configuration file name")
-//
-var TestConfigLoadFlag	= flag.Bool("test_config",false,"test configuration?")
-//var TestConfigLoadFlag bool
+var(
+	//will be used to notify users about some important facts
+	Notifier *NotificationsModule
+	//global module for recording session,task, job progress
+	Monitoring Monitor
+	//last sucessfull etl
+	//todo: change name to something more generic. move it to session context when available
+	LastEtl	time.Time
+	//
+	ConfigFileNameFlag	= flag.String("config", "", "configuration file name")
+	//
+	TestConfigLoadFlag	= flag.Bool("test_config",false,"test configuration?")
+	//var TestConfigLoadFlag bool
+	//current session id
+	GSessionId string
+)
 
 func main() {
 	//parse parameters
@@ -74,7 +77,8 @@ func main() {
 		Printf("$LastEtl = %s\n",LastEtl.Format(LastEtlFileFormat))
 	}
 
-	configuration.SessionID	=	time.Now().Format(SessionFileFormat)
+	GSessionId				=	time.Now().Format(SessionFileFormat)
+	configuration.SessionID	=	GSessionId
 	configuration.Done		=	make(chan struct{})
 
 	//do we test config only?

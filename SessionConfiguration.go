@@ -16,19 +16,19 @@ type SessionConfiguration struct{
 }
 
 func (this *SessionConfiguration) StartSession()(*MonitoringError){
-	return Monitoring.Trace(this.SessionID,"",0,0,StartSession,this)
+	return Monitoring.Trace("",StartSession)
 }
 
 func (this *SessionConfiguration) SessionSuccess()(*MonitoringError){
-	return Monitoring.TraceOK(this.SessionID,"",0,0,StopSession,this,true)
+	return Monitoring.TraceOK("",StopSession,true)
 
 }
 func (this *SessionConfiguration) SessionFail()(*MonitoringError){
-	return Monitoring.Trace(this.SessionID,"",0,0,StopSession,this)
+	return Monitoring.Trace("",StopSession)
 }
 
 func (this *SessionConfiguration) Trace(msg string)(*MonitoringError){
-	return Monitoring.Trace(this.SessionID,"",0,0,Trace,msg)
+	return Monitoring.Trace("",Trace)
 }
 
 func (this*SessionConfiguration) Init()error{
