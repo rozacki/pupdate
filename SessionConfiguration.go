@@ -20,7 +20,7 @@ func (this *SessionConfiguration) StartSession()(*MonitoringError){
 }
 
 func (this *SessionConfiguration) SessionSuccess()(*MonitoringError){
-	return Monitoring.TraceOK("",StopSession,true)
+	return Monitoring.TraceOK("",SessionSuccess,true)
 
 }
 func (this *SessionConfiguration) SessionFail()(*MonitoringError){
