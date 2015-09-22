@@ -38,6 +38,10 @@ var(
 	//last sucessfull etl
 	//todo: change name to something more generic. move it to session context when available
 	LastEtl	time.Time
+	LastEtlFlag			=	flag.String("last_etl","","last etl date, not mandatory")
+	//
+	EtlTo time.Time
+	EtlToFlag		= flag.String("etl_to","","etl data up to date, not mandatory")
 	//
 	ConfigFileNameFlag	= flag.String("config", "", "configuration file name")
 	//
@@ -68,13 +72,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	//find last_elt timestamp
-	if lastEtl,err:=findLastEtlTime(); err!=nil{
-		Printf("error finding $LastEtl:%s\n", err)
+	//set last, etl to global variable
+	//this flag is used onyl for testing purposes
+	EtlTo,_		=	time.Parse(LastEtlFileFormat,*EtlToFlag)
+	//set last etl to global variable
+	LastEtl,_	=	time.Parse(LastEtlFileFormat,*LastEtlFlag)
+	//if last etl date was not provided then ww try to find it mongst log files
+	if LastEtl.IsZero() {
+		//find last_elt timestamp
+		if lastEtl, err := findLastEtlTime(); err!=nil {
+			Printf("error finding $LastEtl:%s\n", err)
+			os.Exit(1)
+		}else{
+			LastEtl=lastEtl
+		}
+	}
+
+	Printf("$LastEtl = %s\n",LastEtl.Format(LastEtlFileFormat))
+	Printf("$EtlTo = %s\n",EtlTo.Format(LastEtlFileFormat))
+
+	if !EtlTo.IsZero()&&EtlTo.Sub(LastEtl)<=0{
+		Printf("EtlTo must not be smaller than LastEtl")
 		os.Exit(1)
-	}else{
-		LastEtl=lastEtl
-		Printf("$LastEtl = %s\n",LastEtl.Format(LastEtlFileFormat))
 	}
 
 	GSessionId				=	time.Now().Format(SessionFileFormat)
@@ -150,7 +169,12 @@ func SerialiseStruct(v interface{}) {
 	ioutil.WriteFile(DefaultStatusFileName, bytes, 0644)
 }
 func Printf(format string,args... interface{}){
-	fmt.Printf("main:"+format+"\n",args)
+	const (MainLiteral ="MAIN:")
+	if len(args)<0 {
+		fmt.Printf(MainLiteral+format+"\n")
+	}else{
+		fmt.Printf(MainLiteral+format+"\n",args)
+	}
 }
 
 func usage(){

@@ -120,6 +120,8 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 						taskData.MaxAttemptJobsDropped++
 						//
 						taskData.LastDroppedJob.LastErrorMsg="max attempts reached"
+						//record that fact
+						this.Configuration.SessionFail()
 						//we quit on first dropped job
 						return taskData
 					}
@@ -156,6 +158,8 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 				}
 				//try to resolve $LastEtl to date time
 				Query=strings.Replace(Query,LastEtlVariableName,LastEtl.Format(SessionFileFormat),-1)
+				//try to resolve $ToEtl do date time
+				Query=strings.Replace(Query,EtlToVariableName,EtlTo.Format(SessionFileFormat),-1)
 				//store only data that is requred and specifc for job
 				jobData = &JobData{Id: taskData.JobId, Query: Query}
 				//move cursor to the next step
@@ -212,9 +216,6 @@ func (this *SessionController) Exec(jobContext JobContext) {
 	//how many rows were affected by Exec() (if supported by SQL driver)
 	var totalRowsAffected uint64
 
-	//monitoring-start job
-	jobContext.EventStartJob()
-
 	//log some debuf info if in debug mode
 	Debug(jobContext.Debug,jobContext)
 	Debug(jobContext.Debug,jobContext.JobData)
@@ -238,8 +239,6 @@ func (this *SessionController) Exec(jobContext JobContext) {
 		//
 		Debug(jobContext.Debug,jobContext)
 		Debug(jobContext.Debug,jobContext.JobData)
-		//monitor-finish job
-		jobContext.EventStopTJob()
 	}()
 
 	//how to use connection pool?
@@ -286,14 +285,14 @@ func Debugf(b bool, format string,args ...interface{}){
 }
 
 func Debug(b bool, v interface{}){
-	const (DebugLiteral="debug")
+	const (DebugLiteral="DEBUG")
 	defer func(){
 		recover()
 	}()
 	if b{
 		switch t:=v.(type){
-			case string: fmt.Print(DebugLiteral+":"+t)
-			default:fmt.Printf(DebugLiteral+":%#v\n", t)
+			case string: fmt.Print("\n"+DebugLiteral+":"+t)
+			default:fmt.Printf("\n"+DebugLiteral+":%#v\n", t)
 	}
 	}
 }
