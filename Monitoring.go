@@ -18,6 +18,8 @@ const(
 	Trace="Trace"
 	StartJob="StartJob"
 	StopJob="StopJob"
+	SessionSuccess	=	"SessionSuccess"
+	SessionFail		=	"SessionFail"
 
 	SessionLogFileExt 		=	".log"
 	DatSessionLogFileExt =	".dat"
@@ -30,6 +32,7 @@ const(
 	//last etl variable name used in sql staements
 	//todo: change name into last_success_session
 	LastEtlVariableName		="$last_etl"
+	EtlToVariableName		= "$etl_to"
 )
 
 //Monitoring module
@@ -79,12 +82,7 @@ func (this*MonitoringModule) Trace(taskName string,event string)(*MonitoringErro
 
 func (this*MonitoringModule) TraceOK(taskName string,event string, ok bool)(*MonitoringError){
 
-	Ev :=struct{
-		Event string
-		TaskName string
-	}{
-		event ,taskName,
-	}
+	Ev:= fmt.Sprintf("event:%s, task name:%s",event,taskName)
 	var err error
 	//is log file specific for this sesion is open now?
 	//I don't check if event type is "NewSession"
@@ -99,13 +97,13 @@ func (this*MonitoringModule) TraceOK(taskName string,event string, ok bool)(*Mon
 		this.Printf("session file '%s' created",this.FileName)
 	}
 
-	s:= fmt.Sprintf("\n %+v \n", Ev)
+	s:= fmt.Sprintf("%s \n", Ev)
 	if _, err = this.File.WriteString(s); err != nil {
 		return nil
 	}
 
 	//if event=="StopSession" then write event, close the file and change the name
-	if event==StopSession{
+	if event==StopSession || event==SessionSuccess{
 		this.File.Close()
 		this.Printf("session log closed")
 		if ok{
@@ -117,7 +115,11 @@ func (this*MonitoringModule) TraceOK(taskName string,event string, ok bool)(*Mon
 	return nil
 }
 func (this*MonitoringModule)Printf(format string,args... string){
-	fmt.Printf("monitoring:"+format+"\n",args)
+	if len(args)==0{
+		fmt.Print(format)
+	}else {
+		fmt.Printf("monitoring:"+format+"\n",args)
+	}
 }
 // Depending on configuration we can support db monitoring.
 // Currently we suport only log-based monitoring
