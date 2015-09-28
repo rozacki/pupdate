@@ -3,7 +3,8 @@ package main
 import(
 
 	"strings"
-	_"fmt"
+	"fmt"
+	_ "database/sql/driver"
 )
 
 type TaskConfiguration struct {
@@ -31,23 +32,35 @@ type TaskConfiguration struct {
 	//Allows to debug individual tasks. This flag is inherited by JonContext.
 	Debug bool
 //**************** dynamic parameters
-	//current session id
-	SessionId string
 	//current task Id
 	TaskId uint64
 }
 //TaskConfiguration extands existing MonitoringModule
-func (this* TaskConfiguration) EventStartTask()(*MonitoringError){
-	return Monitoring.Trace(this.Name,StartTask)
+func (this* TaskConfiguration) EventStartTask()(error){
+	return GMonitoring.Trace(this.Name,StartTask)
 }
 
-func (this* TaskConfiguration) EventStopTask()(*MonitoringError){
-	return Monitoring.Trace(this.Name,StopTask)
+func (this* TaskConfiguration) EventSuccessTask()(error){
+	return GMonitoring.Trace(this.Name,TaskSuccess)
 }
 
-func (this* TaskConfiguration) Trace(data interface{})(*MonitoringError){
-	return Monitoring.Trace(this.Name,Trace)
+func (this* TaskConfiguration) EventFailTask(reason string)(error){
+	return GMonitoring.Tracef(this.Name,"%s,reason: %s ",TaskFailed,reason)
 }
+
+
+func (this* TaskConfiguration) Trace(data interface{})(error){
+	return GMonitoring.Trace(this.Name,Trace)
+}
+
+func (this* TaskConfiguration) RowsAffected(rowsAffected uint64)(error){
+	return GMonitoring.Trace(this.Name,fmt.Sprintf("%s:%d",RowsAffected,rowsAffected))
+}
+
+func (this* TaskConfiguration) TotalRowsAffected(rowsAffected uint64)(error){
+	return GMonitoring.Trace(this.Name,fmt.Sprintf("%s:%d",TotalRowsAffected,rowsAffected))
+}
+
 //does some housekeeping int he task configuration, shoudl be called after configuration is loaded
 func (this* TaskConfiguration) Init() error{
 	if len(this.ExecTab)>0{
