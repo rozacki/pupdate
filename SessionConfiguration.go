@@ -1,5 +1,5 @@
 package main
-import _"fmt"
+import "fmt"
 
 type SessionConfiguration struct{
 	//monitoring
@@ -8,27 +8,21 @@ type SessionConfiguration struct{
 	Notifications NotificationConfiguration
 	//all tasks for this session
 	Tasks []TaskConfiguration
-	//
-	SessionID	string
 	TaskCounter	uint64
 	//
 	Done chan struct{}
 }
 
-func (this *SessionConfiguration) StartSession()(*MonitoringError){
-	return Monitoring.Trace("",StartSession)
-}
-
-func (this *SessionConfiguration) SessionSuccess()(*MonitoringError){
-	return Monitoring.TraceOK("",SessionSuccess,true)
+func (this *SessionConfiguration) SessionSuccess()(error){
+	return GMonitoring.TraceOK("",SessionSuccess,true)
 
 }
-func (this *SessionConfiguration) SessionFail()(*MonitoringError){
-	return Monitoring.Trace("",StopSession)
+func (this *SessionConfiguration) SessionFailed(reason string)(error){
+	return GMonitoring.Tracef("%s, reason:%s",SessionFailed,reason)
 }
 
-func (this *SessionConfiguration) Trace(msg string)(*MonitoringError){
-	return Monitoring.Trace("",Trace)
+func (this *SessionConfiguration) TaskDisabled(taskName string)(error){
+	return GMonitoring.Trace(taskName,TaskDisabled)
 }
 
 func (this*SessionConfiguration) Init()error{
