@@ -13,20 +13,30 @@ type SessionController struct {
 	Configuration SessionConfiguration
 }
 
-func makeSessionController(configuration SessionConfiguration)(session* SessionController){
+
+//simple string error type
+type StringError struct{
+	string
+}
+
+func (this StringError) Error() string{
+	return this.string
+}
+
+func makeSessionController(configuration SessionConfiguration)(session* SessionController,err error){
 	//is there  any task to schedule?
 	if len(configuration.Tasks)==0{
-		fmt.Println("no tasks to schedule, stop")
-		return nil
+		return nil,StringError{"no tasks to schedule, stop"}
 	}
 
 	//generate session name
 	sessionController:=SessionController{Configuration:configuration}
-	//try to record progress, if fails it means that monitoring module is not ok
-	if err:=configuration.StartSession();err!=nil{
-		return nil
+	//open loging file explicitly
+	if err:=GMonitoring.OpenLog();err!=nil{
+		return nil,err
 	}
-	return &sessionController
+
+	return &sessionController,nil
 }
 
 //Runs job in order
@@ -34,22 +44,18 @@ func (this *SessionController) StartTasks() {
 	for _,task:=range this.Configuration.Tasks{
 		//if task is disabled then we skip it
 		if task.Disabled{
-			this.Configuration.Trace(fmt.Sprintf("Task disabled:%",task.Name))
+			this.Configuration.TaskDisabled(task.Name)
 			continue
 		}
 		//
 		this.Configuration.TaskCounter++
-		//
-		task.SessionId	=	this.Configuration.SessionID
+
 		//synchronous task
 		taskData:=this.startTask(task,this.Configuration.Done)
-		//
-		//Monitoring
-		if taskData.MaxAttemptJobsDropped>0{
-			//we record it
-			this.Configuration.Trace(fmt.Sprintf("session failed: '%s'. Task details %+v",taskData.LastDroppedJob.LastErrorMsg,taskData))
-			//todo: SessionContext should provide monitoring interface
-			this.Configuration.SessionFail()
+
+		//at first task failed terminates session
+		if taskData.Failed{
+			this.Configuration.SessionFailed(fmt.Sprintf("'%s'. Task details %+v",taskData.LastDroppedJob.LastErrorMsg,taskData))
 			return
 		}
 		//if sucess then store task.CreationTime and flag success
@@ -91,8 +97,13 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 	var jobDataChannel		=	make(chan *JobData, configuration.Concurrency)
 	//
 	defer func(){
-		//record that fact
-		configuration.EventStopTask()
+		if taskData.Failed {
+			//record that fact
+			configuration.EventFailTask(taskData.LastDroppedJob.LastErrorMsg)
+		}else{
+			configuration.RowsAffected(taskData.RowsAffected)
+			configuration.EventSuccessTask()
+		}
 		//last serialisation
 		SerialiseStruct(this.Configuration)
 		//close task<-job comm channel
@@ -119,9 +130,9 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 						//record how many has been dropped- it will be only one
 						taskData.MaxAttemptJobsDropped++
 						//
-						taskData.LastDroppedJob.LastErrorMsg="max attempts reached"
-						//record that fact
-						this.Configuration.SessionFail()
+						taskData.LastDroppedJob.LastErrorMsg="max attempts reached, reason:"+jobData.LastErrorMsg
+						//
+						taskData.Failed=true
 						//we quit on first dropped job
 						return taskData
 					}
@@ -130,6 +141,9 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 
 				} else {
 					taskData.Success++
+					//record the fact that that maany rows were affected by this job
+					//configuration.RowsAffected(jobData.RowsAffected)
+					taskData.RowsAffected=taskData.RowsAffected+jobData.RowsAffected
 				}
 
 				//got report back, decrease the length
@@ -214,7 +228,7 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 //Exec executes a query without returning any rows
 func (this *SessionController) Exec(jobContext JobContext) {
 	//how many rows were affected by Exec() (if supported by SQL driver)
-	var totalRowsAffected uint64
+	//var totalRowsAffected uint64
 
 	//log some debuf info if in debug mode
 	Debug(jobContext.Debug,jobContext)
@@ -269,15 +283,13 @@ func (this *SessionController) Exec(jobContext JobContext) {
 		Debug(jobContext.Debug,err)
 		panic(err)
 	}
-	var rowsAffected int64
-	//if diriver supports rows affected and last inserted id
+	//if driver supports rows affected and last inserted id
 	if rowsAffected,err:=result.RowsAffected();err==nil{
-		totalRowsAffected+=uint64(rowsAffected)
+		jobContext.JobData.RowsAffected=uint64(rowsAffected)
 	}
 
 	Debugf(jobContext.Debug,"exec query %s \n",jobContext.JobData.Query)
-	Debugf(jobContext.Debug,"rows affected: %d\n",rowsAffected)
-	Debugf(jobContext.Debug,"total rows affected: %d\n",totalRowsAffected)
+	Debugf(jobContext.Debug,"rows affected: %d\n",jobContext.JobData.RowsAffected)
 }
 
 func Debugf(b bool, format string,args ...interface{}){
