@@ -15,4 +15,6 @@ type JobData struct {
 	Attempts  uint64
 	//
 	Query string
+	//how many rows have been affected based on what driver returns
+	RowsAffected uint64
 }
