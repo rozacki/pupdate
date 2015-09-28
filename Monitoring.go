@@ -19,7 +19,12 @@ const(
 	StartJob="StartJob"
 	StopJob="StopJob"
 	SessionSuccess	=	"SessionSuccess"
-	SessionFail		=	"SessionFail"
+	SessionFailed =	"SessionFail"
+	RowsAffected	=	"RowsAffected"
+	TotalRowsAffected	=	"TotalRowsAffected"
+	TaskFailed		=	"TaskFailed"
+	TaskSuccess		=	"TaskSuccess"
+	TaskDisabled	=	"TaskDisabled"
 
 	SessionLogFileExt 		=	".log"
 	DatSessionLogFileExt =	".dat"
@@ -33,6 +38,8 @@ const(
 	//todo: change name into last_success_session
 	LastEtlVariableName		="$last_etl"
 	EtlToVariableName		= "$etl_to"
+
+	LoggingError		="logging error"
 )
 
 //Monitoring module
@@ -45,9 +52,14 @@ type MonitoringModule struct{
 }
 
 //Error information sepcific to Monitoring module
-type MonitoringError struct{
-	Msg string
-	Code string
+type MonitoringError struct {
+	//original error
+	error
+	Msg      string
+}
+
+func (this MonitoringError) Error() string{
+	return this.Msg
 }
 
 //The interface- how not be so verbose? https://medium.com/@matryer/writing-middleware-in-golang-and-how-go-makes-it-so-much-fun-4375c1246e81
@@ -76,72 +88,130 @@ func (this*MonitoringModule) record(msg string)(err error){
 	return nil
 }
 
-func (this*MonitoringModule) Trace(taskName string,event string)(*MonitoringError){
+func (this*MonitoringModule) Trace(taskName string,event string)(error){
 	return this.TraceOK(taskName,event,false)
 }
 
-func (this*MonitoringModule) TraceOK(taskName string,event string, ok bool)(*MonitoringError){
+func (this*MonitoringModule) TraceOK(taskName string,event string, ok bool)(err error){
+	defer func(){
+		err=this.handleLogError(recover())
+	}()
 
-	Ev:= fmt.Sprintf("event:%s, task name:%s",event,taskName)
-	var err error
+	Ev:= fmt.Sprintf("%s, task name:%s",taskName, event)
+	s:= fmt.Sprintf("%s %s \n",time.Now().Format(time.StampMilli), Ev)
+	if _, err := this.File.WriteString(s); err != nil {
+		panic(err)
+	}
+
+	return nil
+}
+
+func (this*MonitoringModule)handleLogError(recoveredValue interface{})(err error){
+	const (LogginError ="Logging error")
+	if recoveredValue!=nil {
+		var errorMsg string
+		switch v:=recoveredValue.(type){
+			case error:
+			errorMsg=fmt.Sprintf("%s: %s",LogginError, v.Error())
+			case string:
+			errorMsg=fmt.Sprintf("%s: %s",LogginError, v)
+			default:
+			errorMsg=fmt.Sprintf("%s: %+v",LogginError, recoveredValue)
+		}
+		this.Printf(errorMsg)
+		return &MonitoringError{Msg:errorMsg}
+	}else{
+		//will calling function return nil
+		return nil
+	}
+}
+
+func (this* MonitoringModule)OpenLog()(err error){
+	defer func(){
+		err=this.handleLogError(recover())
+	}()
+
 	//is log file specific for this sesion is open now?
 	//I don't check if event type is "NewSession"
 	if this.File==nil{
 		//if file sid file is not open and does not exist then open it
 		//if file is not open and does exist then fmt.Println() and return
 		this.FileName=filepath.Join(SessionLogFolder,GSessionId+SessionLogFileExt)
-		if this.File,err=os.OpenFile(this.FileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY| os.O_EXCL, 0600);err!=nil{
-			this.Printf("error '%s' during creating session file '%s' ",err.Error(), this.FileName)
-			return nil
+		var openError error
+		if this.File, openError=os.OpenFile(this.FileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY| os.O_EXCL, 0600); openError!=nil{
+			this.Debugf("error '%s' during creating session file '%s' ", openError.Error(), this.FileName)
+			panic(openError)
 		}
-		this.Printf("session file '%s' created",this.FileName)
+		//if we output session name then user will know which file to look into
+		this.Printf("session file created '%s' ",this.FileName)
 	}
-
-	s:= fmt.Sprintf("%s \n", Ev)
-	if _, err = this.File.WriteString(s); err != nil {
-		return nil
-	}
-
-	//if event=="StopSession" then write event, close the file and change the name
-	if event==StopSession || event==SessionSuccess{
-		this.File.Close()
-		this.Printf("session log closed")
-		if ok{
-			os.Rename(this.FileName,filepath.Join(SessionLogFolder,GSessionId+DatSessionLogFileExt))
-			this.Printf("session log renamed")
-		}
-	}
-
 	return nil
 }
-func (this*MonitoringModule)Printf(format string,args... string){
-	if len(args)==0{
-		fmt.Print(format)
-	}else {
-		fmt.Printf("monitoring:"+format+"\n",args)
+
+//Explicit closing log file. If success=true then file's extension is changed.
+//If success then file's extension stays intact
+func (this*MonitoringModule) CloseLog(success bool)(err error){
+	defer func(){
+		if err:=recover();err!=nil {
+			Printf(LoggingError)
+		}
+	}()
+	this.File.Close()
+	this.Debugf("session log closed")
+	if success{
+		os.Rename(this.FileName,filepath.Join(SessionLogFolder,GSessionId+DatSessionLogFileExt))
+		this.Debugf("session log renamed")
+	}
+	return nil;
+}
+//outputs additional details to the console if Debug=true
+func (this*MonitoringModule)Debugf(format string,args... string){
+	if this.Configuration.Debug {
+		Printf(format,args)
 	}
 }
+//outputs to console regardless Debug flag
+func (this*MonitoringModule)Printf(format string,args... string){
+	const (Monitoring	="MONITORING:")
+	if len(args)==0 {
+		fmt.Println(Monitoring+format)
+	}else {
+		fmt.Printf(Monitoring+format+"\n", args)
+	}
+}
+
+//outputs to the session log file
+func (this*MonitoringModule)Tracef(taskName string,format string, args... string)(error){
+	return this.Trace(taskName,fmt.Sprintf(format,args))
+}
+
 // Depending on configuration we can support db monitoring.
 // Currently we suport only log-based monitoring
 type MonitoringConfiguration struct{
 	Dsn string
+	Debug bool
 }
 
-func makeMonitoring(configuration MonitoringConfiguration)(Monitor){
+func makeMonitoring(configuration MonitoringConfiguration)(Monitor,error){
 	if len(configuration.Dsn)==0{
-		fmt.Printf("missing dsn for monitoring module")
-		return nil;
+		return nil,StringError{"missing dsn for monitoring module"}
 	}
 	//we support only one monitoring type
-	return &MonitoringModule{Configuration:configuration}
+	return &MonitoringModule{Configuration:configuration},nil
 }
 
 //specific interface for monitoring sessions, tasks, jobs. It wraps logger api into a number of domain specific methods.
 type Monitor interface{
 	//generic method
-	Trace(taskName string,event string,)(*MonitoringError)
+	Trace(taskName string,event string)(error)
 	//generic method thta accespts success ot false
-	TraceOK(taskName string,event string, ok bool)(*MonitoringError)
+	TraceOK(taskName string,event string, ok bool)(error)
+	//
+	Tracef(taskName string,format string, args... string)(error)
+	//
+	OpenLog()(err error)
+	//
+	CloseLog(bool)(err error)
 }
 
 func findLastEtlTime() (time.Time,error) {
