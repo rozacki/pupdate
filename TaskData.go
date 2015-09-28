@@ -29,4 +29,8 @@ type TaskData struct {
 	CreationTime time.Time
 	//last dropped job
 	LastDroppedJob JobData
+	//total rows affected by this task
+	RowsAffected	uint64
+	//indicated if task failed or not
+	Failed bool
 }
