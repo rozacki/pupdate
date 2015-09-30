@@ -9,30 +9,36 @@ import(
 	_"os"
 )
 
+const(
+	FormatStruct	=	"%#v"
+)
+
 type SessionController struct {
 	Configuration SessionConfiguration
 }
 
-
+/*
 //simple string error type
 type StringError struct{
 	string
 }
-
+*/
 func (this StringError) Error() string{
-	return this.string
+	return string(this)
 }
+
+type StringError string
 
 func makeSessionController(configuration SessionConfiguration)(session* SessionController,err error){
 	//is there  any task to schedule?
 	if len(configuration.Tasks)==0{
-		return nil,StringError{"no tasks to schedule, stop"}
+		return nil,StringError("no tasks to schedule, stop")
 	}
 
 	//generate session name
 	sessionController:=SessionController{Configuration:configuration}
-	//open loging file explicitly
-	if err:=GMonitoring.OpenLog();err!=nil{
+	//open logging file explicitly
+	if err:= GLogging.OpenLog();err!=nil{
 		return nil,err
 	}
 
@@ -51,24 +57,19 @@ func (this *SessionController) StartTasks() {
 		this.Configuration.TaskCounter++
 
 		//synchronous task
-		taskData:=this.startTask(task,this.Configuration.Done)
+		taskData:=this.startTask(task)
 
-		//at first task failed terminates session
+		//on first task failed terminates session
 		if taskData.Failed{
 			this.Configuration.SessionFailed(fmt.Sprintf("'%s'. Task details %+v",taskData.LastDroppedJob.LastErrorMsg,taskData))
 			return
 		}
-		//if sucess then store task.CreationTime and flag success
-		/*
-		if taskData.Success==false{
-			fmt.Printf("task failed:%n",)
-		}
-		*/
-		//should I finish’
+
+		//should I finish
 		select{
-		//global flag to finish processing. it is used by main thread and allow user to signal termination
-		case <-this.Configuration.Done:
-			fmt.Printf("task exiting\n")
+		//this channel is used as global flag to finish processing. it is used by main thread and allow user to signal termination
+		case <-GDone:
+			fmt.Printf("session terminated\n")
 			return
 		case  <-time.After(1* time.Millisecond):
 		}
@@ -78,7 +79,7 @@ func (this *SessionController) StartTasks() {
 //runs single task by spawning jobs
 //todo: cancellation via done channel
 //todo: move to taskcontroller
-func (this *SessionController) startTask(configuration TaskConfiguration, done <-chan struct{}) TaskData {
+func (this *SessionController) startTask(configuration TaskConfiguration) TaskData {
 	configuration.EventStartTask()
 
 	//create new task data structure where we hold op data and configuration
@@ -109,10 +110,10 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 		//close task<-job comm channel
 		close(jobDataChannel)
 		//
-		Debug(configuration.Debug, configuration)
+		this.Debugf(configuration.Debug, FormatStruct, configuration)
 	}()
 
-	Debug(configuration.Debug, configuration)
+	this.Debugf(configuration.Debug,FormatStruct,  configuration)
 
 	for {
 		var jobData *JobData
@@ -121,7 +122,7 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 			{
 				//check status, if it error then scheduled it again
 				if jobData.Error {
-					Debug(configuration.Debug,jobData)
+					this.Debugf(configuration.Debug,FormatStruct,jobData)
 					//increment errors counter
 					taskData.Errors++
 					//record last dropped
@@ -152,7 +153,7 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 		//
 		case <-time.After(time.Duration(taskData.Timeout) * time.Millisecond):
 		//cancellation
-		case <-done:
+		case <-GDone:
 			//return current state of task
 			return taskData
 		}
@@ -182,14 +183,14 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 				taskData.JobId++
 			}
 
-			jobContext:=	JobContext{
+			jobContext:=	JobExecutionContext{
 				JobData:jobData,
 				Dsn:configuration.Dsn,
 				PreSteps:configuration.PreSteps,
 				JobDataChannel:jobDataChannel,
 				Debug:configuration.Debug,
 				TaskName:configuration.Name}
-			Debug(configuration.Debug,jobContext)
+			this.Debugf(configuration.Debug,FormatStruct,jobContext)
 			//schedule the job
 			//todo: switch case here: Exec, Query, QueryOne
 			go this.Exec(jobContext)
@@ -226,13 +227,13 @@ func (this *SessionController) startTask(configuration TaskConfiguration, done <
 //todo:implement query
 //todo: implement queryrow - that returns at most one row
 //Exec executes a query without returning any rows
-func (this *SessionController) Exec(jobContext JobContext) {
+func (this *SessionController) Exec(jobContext JobExecutionContext) {
 	//how many rows were affected by Exec() (if supported by SQL driver)
 	//var totalRowsAffected uint64
 
 	//log some debuf info if in debug mode
-	Debug(jobContext.Debug,jobContext)
-	Debug(jobContext.Debug,jobContext.JobData)
+	this.Debugf(jobContext.Debug,FormatStruct,jobContext)
+	this.Debugf(jobContext.Debug,FormatStruct,jobContext.JobData)
 
 	//store start time- for reporting purposes
 	jobContext.JobData.StartTime = time.Now()
@@ -240,7 +241,7 @@ func (this *SessionController) Exec(jobContext JobContext) {
 	//all deffered functions
 	defer func() {
 		if err := recover(); err != nil {
-			Debugf(jobContext.Debug,"panic %s\n",err)
+			this.Debugf(jobContext.Debug,"panic %s\n",err)
 			jobContext.JobData.Error 		= 	true
 			jobContext.JobData.LastErrorMsg	=	fmt.Sprintf("%s",err)
 		}
@@ -251,14 +252,14 @@ func (this *SessionController) Exec(jobContext JobContext) {
 		//notify producer that another job has finished
 		jobContext.JobDataChannel <- jobContext.JobData
 		//
-		Debug(jobContext.Debug,jobContext)
-		Debug(jobContext.Debug,jobContext.JobData)
+		this.Debugf(jobContext.Debug,FormatStruct,jobContext)
+		this.Debugf(jobContext.Debug,FormatStruct,jobContext.JobData)
 	}()
 
 	//how to use connection pool?
 	db, err := sql.Open("mysql", jobContext.Dsn)
 	if err != nil {
-		Debug(jobContext.Debug,err)
+		this.Debugf(jobContext.Debug,FormatStruct,err)
 		panic(err)
 	}
 	//close connection hence no side effects
@@ -269,10 +270,10 @@ func (this *SessionController) Exec(jobContext JobContext) {
 	for _,stmt:=range jobContext.PreSteps {
 		_, err := db.Exec(stmt)
 		if err != nil {
-			Debug(jobContext.Debug,err)
+			this.Debugf(jobContext.Debug,FormatStruct,err)
 			panic(err)
 		}
-		Debugf(jobContext.Debug,"pre-exec: %s",stmt)
+		this.Debugf(jobContext.Debug,"pre-exec: %s",stmt)
 	}
 
 	var result sql.Result
@@ -280,7 +281,7 @@ func (this *SessionController) Exec(jobContext JobContext) {
 	result, err = db.Exec(jobContext.JobData.Query)
 
 	if err != nil {
-		Debug(jobContext.Debug,err)
+		this.Debugf(jobContext.Debug,FormatStruct,err)
 		panic(err)
 	}
 	//if driver supports rows affected and last inserted id
@@ -288,27 +289,14 @@ func (this *SessionController) Exec(jobContext JobContext) {
 		jobContext.JobData.RowsAffected=uint64(rowsAffected)
 	}
 
-	Debugf(jobContext.Debug,"exec query %s \n",jobContext.JobData.Query)
-	Debugf(jobContext.Debug,"rows affected: %d\n",jobContext.JobData.RowsAffected)
+	this.Debugf(jobContext.Debug,"exec query %s \n",jobContext.JobData.Query)
+	this.Debugf(jobContext.Debug,"rows affected: %d\n",jobContext.JobData.RowsAffected)
 }
 
-func Debugf(b bool, format string,args ...interface{}){
-	Debug(b,fmt.Sprintf(format,args))
-}
 
-func Debug(b bool, v interface{}){
-	const (DebugLiteral="DEBUG")
-	defer func(){
-		recover()
-	}()
-	if b{
-		switch t:=v.(type){
-			case string: fmt.Print("\n"+DebugLiteral+":"+t)
-			default:fmt.Printf("\n"+DebugLiteral+":%#v\n", t)
+func (this *SessionController)Debugf(enabled bool,format string, args... interface{}){
+	if enabled {
+		GDLogger.Debugf(format,args)
 	}
-	}
-}
-
-func (this*SessionController) Fatalf(format string, v ...interface{}){
-
+	return
 }

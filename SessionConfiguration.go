@@ -2,26 +2,15 @@ package main
 
 type SessionConfiguration struct{
 	//monitoring
-	Monitoring MonitoringConfiguration
+	Logging MonitoringConfiguration
 	//notificactions
 	Notifications NotificationConfiguration
 	//all tasks for this session
 	Tasks []TaskConfiguration
-	TaskCounter	uint64
 	//
-	Done chan struct{}
-}
-
-func (this *SessionConfiguration) SessionSuccess()(error){
-	return GMonitoring.TraceOK("",SessionSuccess,true)
-
-}
-func (this *SessionConfiguration) SessionFailed(reason string)(error){
-	return GMonitoring.Tracef("%s, reason:%s",SessionFailed,reason)
-}
-
-func (this *SessionConfiguration) TaskDisabled(taskName string)(error){
-	return GMonitoring.Trace(taskName,TaskDisabled)
+	TaskCounter	uint64
+	//interface to session execution context
+	ExecutionContext SessionExecutionContext
 }
 
 func (this*SessionConfiguration) Init()error{
@@ -31,4 +20,16 @@ func (this*SessionConfiguration) Init()error{
 		}
 	}
 	return nil;
+}
+//
+func (this *SessionConfiguration) SessionSuccess()(error){
+	return GLogging.Tracef("",SessionSuccess)
+
+}
+func (this *SessionConfiguration) SessionFailed(reason string)(error){
+	return GLogging.Tracef("%s, reason:%s",SessionFailed,reason)
+}
+
+func (this *SessionConfiguration) TaskDisabled(taskName string)(error){
+	return GLogging.Tracef(taskName,TaskDisabled)
 }

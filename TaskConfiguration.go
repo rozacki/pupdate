@@ -37,28 +37,27 @@ type TaskConfiguration struct {
 }
 //TaskConfiguration extands existing MonitoringModule
 func (this* TaskConfiguration) EventStartTask()(error){
-	return GMonitoring.Trace(this.Name,StartTask)
+	return GLogging.Tracef("%s %s",this.Name,StartTask)
 }
 
 func (this* TaskConfiguration) EventSuccessTask()(error){
-	return GMonitoring.Trace(this.Name,TaskSuccess)
+	return GLogging.Tracef("%s %s",this.Name,TaskSuccess)
 }
 
 func (this* TaskConfiguration) EventFailTask(reason string)(error){
-	return GMonitoring.Tracef(this.Name,"%s,reason: %s ",TaskFailed,reason)
+	return GLogging.Tracef("%s %s,reason: %s ",this.Name,TaskFailed,reason)
 }
 
-
 func (this* TaskConfiguration) Trace(data interface{})(error){
-	return GMonitoring.Trace(this.Name,Trace)
+	return GLogging.Tracef("%s %s",this.Name,Trace)
 }
 
 func (this* TaskConfiguration) RowsAffected(rowsAffected uint64)(error){
-	return GMonitoring.Trace(this.Name,fmt.Sprintf("%s:%d",RowsAffected,rowsAffected))
+	return GLogging.Tracef(fmt.Sprintf("%s %s:%d",this.Name,RowsAffected,rowsAffected))
 }
 
 func (this* TaskConfiguration) TotalRowsAffected(rowsAffected uint64)(error){
-	return GMonitoring.Trace(this.Name,fmt.Sprintf("%s:%d",TotalRowsAffected,rowsAffected))
+	return GLogging.Tracef(fmt.Sprintf("%s %s:%d",this.Name,TotalRowsAffected,rowsAffected))
 }
 
 //does some housekeeping int he task configuration, shoudl be called after configuration is loaded

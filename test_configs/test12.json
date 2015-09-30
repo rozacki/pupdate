@@ -1,0 +1,18 @@
+{
+  "Monitoring":{
+    "Dsn":"root:root@dockerhost:32768/monitoring"
+  },
+  "Notifications":{
+    "Email":"chris.rozacki@valtech.co.uk"
+  },
+  "Tasks":[{
+    "Version-this is software version": "v0.1",
+    "Name": "select testresult",
+    "Description":"basic select: no partition",
+    "SessionParam": "",
+    "Dsn": "moth:pass@tcp(localhost:3306)/moth",
+    "Exec": "select count(*) from testresult",
+    "MaxAttempts": 3,
+    "Debug":true
+  }]
+}

@@ -7,8 +7,8 @@
   },
   "Tasks":[{
     "Version-this is software version": "v0.1",
-    "Name": "",
-    "Description":"",
+    "Name": "select partition",
+    "Description":"issues partitioned select",
     "SessionParam": "set session group_concat_max_len=100000",
     "Dsn": "moth:pass@tcp(localhost:3306)/moth",
     "Exec": "select * from testresult where id>=%d and id<%d;",

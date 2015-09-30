@@ -1,6 +1,7 @@
 {
   "Monitoring":{
-    "Dsn":"root:root@tcp(dockerhost:32768)/MOT2_2"
+    "Dsn":"root:root@tcp(dockerhost:32768)/MOT2_2",
+    "Debug":false
   },
   "Notifications":{
     "Email":"chris.rozacki@valtech.co.uk"
@@ -35,10 +36,10 @@
       "Description":"updates all vehicles which have changed since last etl",
       "Dsn": "moth:pass@tcp(localhost:3306)/mot_v195_rel4",
       "PreSteps": [
-      "#use moth_copy",
-      "#set foreign_key_checks=0",
-      "#truncate moth_copy.vehicle",
-      "#use mot_v195_rel4"
+        "use moth_copy",
+        "set foreign_key_checks=0",
+        "truncate vehicle",
+        "use mot_v195_rel4"
       ],
       "Exec": "select * from mot_test where last_updated_on>'$last_etl';",
       "ExecTab":[
@@ -64,13 +65,13 @@
         " and v.last_updated_on>'$last_etl' and v.last_updated_on<='$etl_to';"
       ],
       "MaxAttempts": 3,
-      "Debug":false
+      "Debug":true
     },
     {
       "Name": "insert vehicles",
       "Description": "insert vehicles that don't exist in moth.vehicle",
       "Dsn": "moth:pass@tcp(localhost:3306)/mot_v195_rel4",
-      "ExecTab": ["insert ignore into moth_copy.vehicle",
+      "ExecTab": ["insert into moth_copy.vehicle",
         " (id, manufacturer_id,registration, model, vin, dateFirstUsed, fuelType, colour, wheelPlan, v5cReference, approvalType)",
         " select v.id, v.make_id, v.registration, model.name, v.vin, v.first_used_date, f.name fuel_type, c.name colour, w.name wheel_plan, v5c.v5c_ref, 'approval_type'",
         " from vehicle as v left join moth_copy.vehicle hv on hv.id=v.id",
@@ -88,10 +89,10 @@
       "Name": "update tests",
       "Description":"update tests that changed since last etl",
       "PreSteps": [
-        "#use moth_copy",
-        "#set foreign_key_checks=0",
-        "#truncate moth_copy.testresult",
-        "#use mot_v195_rel4_copy"
+        "use moth_copy",
+        "set foreign_key_checks=0",
+        "truncate testresult",
+        "use mot_v195_rel4_copy"
       ],
       "Dsn": "moth:pass@tcp(localhost:3306)/mot_v195_rel4",
       "SessionParamTab":["set foreign_key_checks=0"],
@@ -116,8 +117,9 @@
       "Name": "insert tests",
       "Description":"insert tests that don't exist on moth.testresult",
       "Dsn": "moth:pass@tcp(localhost:3306)/mot_v195_rel4",
-      "PreSteps":["set foreign_key_checks=0"
-                ,"#truncate moth_copy.testresult"],
+      "PreSteps":[
+        "set foreign_key_checks=0"
+      ],
       "ExecTab": [
         "insert ignore into moth_copy.testresult ",
         "(`id`,`vehicle_id`,`testDate` ,`expiryDate` ,`mileage` ,`mileageUnit` ,`testNumber` ,`pass` ,`reasonForFailure` ,`advisoryNotice` ,`vt20Reference` ,`vt30Reference` ,`testStationName` ,`testStationNumber` ,`testStationPhoneNumber`) ",

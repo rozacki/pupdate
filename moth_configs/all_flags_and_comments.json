@@ -1,0 +1,38 @@
+{
+  "Monitoring":{
+    "c":"if debugging is enabled then...",
+    "Debug":true,
+    "Dsn":"root:root@tcp(dockerhost:32768)/MOT2_2"
+  },
+  "Notifications":{
+    "Email":"chris.rozacki@valtech.co.uk"
+  },
+  "Tasks":[
+    {
+      "Name": "update makes",
+      "Description":"updates all existsing makes regardless of last_updated_on",
+      "PreSteps": [
+        "use moth_copy",
+        "set foreign_key_checks=0;",
+        "truncate moth_copy.vehiclemanufacturer",
+        "use mot_v195_rel4_copy"
+      ],
+      "Dsn": "moth:pass@tcp(localhost:3306)/mot_v195_rel4",
+      "c":"Exec will execute sql command that does not return results",
+      "Exec": "update moth_copy.vehiclemanufacturer mm left join make m on mm.id=m.id set mm.name=m.name",
+      "c":"if ExecTab is empty then Exec is used",
+      "ExecTab":["",""],
+      "c":"how many attempts before job fails. It is now hardcoded that when job fails, immediately task fails hence session fails",
+      "MaxAttempts": 3,
+      "Debug":false,
+      "c":"Max, Min, Concurrency and Step work together to partiotion and parallelise work. Max denotes upper limit",
+      "Max":1000000,
+      "c":"starting offset",
+      "Min":0,
+      "c":"how many concurrent connection to open",
+      "Concurrency":100,
+      "c":"increase by",
+      "Step":100
+    }
+  ]
+}

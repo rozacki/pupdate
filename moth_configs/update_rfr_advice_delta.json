@@ -1,0 +1,57 @@
+{
+  "Monitoring": {
+    "Dsn": "root:root@dockerhost:32768/monitoring"
+  },
+  "Notifications": {
+    "Email": "chris.rozacki@valtech.co.uk"
+  },
+  "Tasks": [
+    {
+      "Name": "updates rfr",
+      "Description": "updates rfr if mot_test.last_updated_on>last etl",
+      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+      "ExecTab": [
+      "update MOTH3.testresult as ht ",
+      "set ht.reasonForFailure=",
+      "ifnull((SELECT group_concat(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(COALESCE(map.location_lateral,''), ' ',",
+      "COALESCE(map.location_longitudinal,''))),' ',COALESCE(map.location_vertical,''))),' ',COALESCE(timap.description, ''))),' ',",
+      "COALESCE(rfrl.name,''))),' ', COALESCE(map.`comment` ,''))),CASE WHEN rfr.inspection_manual_reference ",
+      "IS NOT NULL THEN CONCAT( ' (', rfr.inspection_manual_reference, ')') ELSE ' ' END)) SEPARATOR ',\n') reason_for_refusal ",
+      "FROM mot_test t ",
+      "left join mot_test_rfr_map map on t.id=map.mot_test_id ",
+      "left JOIN language_type l ON l.code='EN' ",
+      "LEFT OUTER JOIN reason_for_rejection rfr ON map.rfr_id=rfr.id ",
+      "LEFT OUTER JOIN rfr_language_content_map rfrl ON rfrl.rfr_id=rfr.id AND rfrl.language_type_id = l.id ",
+      "LEFT OUTER JOIN test_item_category ti ON rfr.test_item_category_id=ti.id ",
+      "LEFT OUTER JOIN ti_category_language_content_map timap ON timap.test_item_category_id = rfr.test_item_category_id ",
+      "AND timap.language_lookup_id = l.id ",
+      "where  ht.id=t.id and t.last_updated_on>'$last_etl' and map.type in ('FAIL')),'')"
+      ],
+      "MaxAttempts": 3,
+      "Debug": true
+    },{
+      "Name": "updates advice",
+      "Description": "updates advice if mot_test.last_updated_on>last etl",
+      "Dsn": "root:root@tcp(dockerhost:32768)/MOT2_2",
+      "ExecTab": [
+        "update MOTH3.testresult as ht ",
+        "set ht.advisoryNotice=",
+        "ifnull((SELECT group_concat(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(TRIM(CONCAT(COALESCE(map.location_lateral,''), ' ',",
+        "COALESCE(map.location_longitudinal,''))),' ',COALESCE(map.location_vertical,''))),' ',COALESCE(timap.description, ''))),' ',",
+        "COALESCE(rfrl.name,''))),' ', COALESCE(map.`comment` ,''))),CASE WHEN rfr.inspection_manual_reference ",
+        "IS NOT NULL THEN CONCAT( ' (', rfr.inspection_manual_reference, ')') ELSE ' ' END)) SEPARATOR ',\n') advice ",
+        "FROM mot_test t ",
+        "left join mot_test_rfr_map map on t.id=map.mot_test_id ",
+        "left JOIN language_type l ON l.code='EN' ",
+        "LEFT OUTER JOIN reason_for_rejection rfr ON map.rfr_id=rfr.id ",
+        "LEFT OUTER JOIN rfr_language_content_map rfrl ON rfrl.rfr_id=rfr.id AND rfrl.language_type_id = l.id ",
+        "LEFT OUTER JOIN test_item_category ti ON rfr.test_item_category_id=ti.id ",
+        "LEFT OUTER JOIN ti_category_language_content_map timap ON timap.test_item_category_id = rfr.test_item_category_id ",
+        "AND timap.language_lookup_id = l.id ",
+        "where  ht.id=t.id and t.last_updated_on>'$last_etl' and map.type not in ('FAIL')),'')"
+      ],
+      "MaxAttempts": 3,
+      "Debug": true
+    }
+  ]
+}

@@ -2,7 +2,6 @@ package main
 
 
 //comfoguration todo:
-// 	multiple tasks from one configuration
 //	add storage_type={mysql|postgress|mongodb...}
 //	add type of operation:{update|insert...}
 //todo error handling:
@@ -13,7 +12,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"time"
 	_"strings"
@@ -29,28 +27,41 @@ const (
 	DefaultStatusFileName = "tasks.json"
 	//must be exact match
 	LastEtlVarName			="$LastEtl"
+	MainLiteral ="MAIN:"
 )
 var(
 	//will be used to notify users about some important facts
 	Notifier *NotificationsModule
-	//global module for recording session,task, job progress
-	GMonitoring Monitor
-	//last sucessfull etl
-	//todo: change name to something more generic. move it to session context when available
+	//global module ued by specialised interfaces for recording session,task, job progress
+	GLogging Logger			=	&LoggingModule{}
+	//global debug logger
+	GDLogger DebugLogger	=	&DebugLoggingModule{}
+	//
+	GCLogger ConsoleLogger	=	&ConsoleLoggerModule{}
+
+	//current session id
+	GSessionId string		=	time.Now().Format(SessionFileFormat)
+	//
+	GDone					=	make(chan struct{})
+	//
+	GSessionConfiguration	*SessionConfiguration
+
+	//
+	GSessionExecutionContext SessionExecutionContext
+)
+
+var (
+//last sucessfull etl
+//todo: change name to something more generic. move it to session context when available
 	LastEtl	time.Time
 	LastEtlFlag			=	flag.String("last_etl","","last etl date, not mandatory")
-	//
+//
 	EtlTo time.Time
 	EtlToFlag		= flag.String("etl_to","","etl data up to date, not mandatory")
-	//
+//
 	ConfigFileNameFlag	= flag.String("config", "", "configuration file name")
-	//
+//
 	TestConfigLoadFlag	= flag.Bool("test_config",false,"test configuration?")
-	//var TestConfigLoadFlag bool
-	//current session id
-	GSessionId string
-	//
-	GSessionConfiguration *SessionConfiguration
 )
 
 func main() {
@@ -64,25 +75,12 @@ func main() {
 		usage()
 	}
 
-	//if file is corrupted then we get nil
 	//if types dont match then we get zero value for that SessionConguration
 	if GSessionConfiguration,err=loadSessionConfiguration(*ConfigFileNameFlag);err != nil {
 		Printf("configuration load error: %s",err.Error())
 		os.Exit(1)
 	}
 	Printf("Configuration loaded. Found %d tasks", len(GSessionConfiguration.Tasks))
-
-	//create monitoring interface
-	if GMonitoring,err=makeMonitoring(GSessionConfiguration.Monitoring); err!=nil{
-		Printf("error while initializing %s",err.Error())
-		os.Exit(1)
-	}
-
-	//immediately create
-	//if err=GMonitoring.OpenLog();err!=nil{
-	//	Printf("error while initializing %s",err.Error())
-	//	os.Exit(1)
-	//}
 
 	//set last, etl to global variable
 	//this flag is used onyl for testing purposes
@@ -108,12 +106,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	GSessionId						=	time.Now().Format(SessionFileFormat)
-	GSessionConfiguration.Done		=	make(chan struct{})
-
 	//do we test config only?
 	if *TestConfigLoadFlag{
-		fmt.Printf("testing config only\n")
+		Printf("testing config only\n")
 		os.Exit(0)
 	}
 
@@ -124,16 +119,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	//this is where fun begins
 	sessionController.StartTasks()
 	//by closing channel we terminate session
-	close(GSessionConfiguration.Done)
-
-	/*
-	var key string
-	fmt.Println("Press key if you want to finish")
-	fmt.Scanf("%s",&key)
-	close(configuration.Done)
-	*/
+	close(GDone)
 }
 
 //
@@ -144,7 +133,7 @@ func loadSessionConfiguration(configurationFileName string) (configuration*Sessi
 			switch v := recovered.(type){
 				case error:err=v
 			}
-			err=StringError{fmt.Sprintf("unknown error, details: %+v", err)}
+			err=StringError(fmt.Sprintf("unknown error, details: %+v", err))
 		}else{
 			err=nil
 		}
@@ -166,39 +155,33 @@ func loadSessionConfiguration(configurationFileName string) (configuration*Sessi
 	return configuration,nil
 }
 
-func setLogOutput() {
-	f, err := os.Create("log.txt")
-	if err != nil {
-		fmt.Println("issue %s", err)
-		return
+func handleError(recoveredValue interface{}) ( error){
+	var err	LoggingError
+	switch v:=recoveredValue.(type){
+		case error: err.Msg=v.Error();err.error=err
+		case nil: return nil
 	}
-	log.SetOutput(f)
+	Printf("%s: Error: %s",MainLiteral,err.Error())
+	return err
 }
+
 
 func SerialiseStruct(v interface{}) {
 	defer func() {
-		//swallow issue anc carry on
-		if err := recover(); err != nil {
-			fmt.Printf("local deffer %+v", err)
-		}
+		handleError(recover())
 	}()
 	bytes, _ := json.Marshal(v)
 	//owner=read+wqrite, group and others=read
 	ioutil.WriteFile(DefaultStatusFileName, bytes, 0644)
 }
 func Printf(format string,args... interface{}){
-	const (MainLiteral ="MAIN:")
-	if len(args)<0 {
-		fmt.Printf(MainLiteral+format+"\n")
-	}else{
-		fmt.Printf(MainLiteral+format+"\n",args)
-	}
+	GCLogger.Printf(MainLiteral+format+"\n",args)
 }
 
 func usage(){
-	fmt.Println("\nData integration tool. Usage:")
-	fmt.Println("pupdate -config=monitoring/configuration_file [-test_config]")
-	fmt.Println("-config path to configiration file name")
-	fmt.Println("-test_config whether to test configuration")
+	Printf("Data integration tool. Usage:\n")
+	Printf("pupdate -config=monitoring/configuration_file [-test_config]\n")
+	Printf("-config path to configiration file name\n")
+	Printf("-test_config whether to test configuration\n")
 	os.Exit(1)
 }
