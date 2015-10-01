@@ -15,6 +15,7 @@ import (
 	"os"
 	"time"
 	_"strings"
+	_"strconv"
 )
 
 type JobConfiguration struct {
@@ -33,7 +34,7 @@ var(
 	//will be used to notify users about some important facts
 	Notifier *NotificationsModule
 	//global module ued by specialised interfaces for recording session,task, job progress
-	GLogging Logger			=	&LoggingModule{}
+	GLogger Logger			=	&LoggingModule{}
 	//global debug logger
 	GDLogger DebugLogger	=	&DebugLoggingModule{}
 	//
@@ -80,6 +81,16 @@ func main() {
 		Printf("configuration load error: %s",err.Error())
 		os.Exit(1)
 	}
+
+	switch GSessionConfiguration.Test.(type){
+		case string: GCLogger.Printf("type string")
+		case int: GCLogger.Printf("type int")
+		case float64: GCLogger.Printf("type float64")
+		default: GCLogger.Printf("unknown type")
+	}
+
+	os.Exit(1)
+
 	Printf("Configuration loaded. Found %d tasks", len(GSessionConfiguration.Tasks))
 
 	//set last, etl to global variable

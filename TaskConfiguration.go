@@ -3,8 +3,6 @@ package main
 import(
 
 	"strings"
-	"fmt"
-	_ "database/sql/driver"
 )
 
 type TaskConfiguration struct {
@@ -12,11 +10,11 @@ type TaskConfiguration struct {
 	Dsn    string
 	Exec   string
 	ExecTab[] string
-	//it will be first parameter in the query
-	//todo: add special value (string) to indicate that all rows. staring from MIN should be transferred
-	Max uint64
-	//it will be the second parameter in the query
-	Min         uint64
+	//if type string it may be sql query, if int then it is max value
+	Max 	uint64//interface{}
+	//if type string it may be sql query, if int then it is min value
+	Min         uint64//interface{}
+	//
 	Step        uint64
 	Concurrency uint64
 	//one of many possible parameters of session
@@ -37,27 +35,27 @@ type TaskConfiguration struct {
 }
 //TaskConfiguration extands existing MonitoringModule
 func (this* TaskConfiguration) EventStartTask()(error){
-	return GLogging.Tracef("%s %s",this.Name,StartTask)
+	return GLogger.Tracef("%s %s",this.Name,StartTask)
 }
 
 func (this* TaskConfiguration) EventSuccessTask()(error){
-	return GLogging.Tracef("%s %s",this.Name,TaskSuccess)
+	return GLogger.Tracef("%s %s",this.Name,TaskSuccess)
 }
 
 func (this* TaskConfiguration) EventFailTask(reason string)(error){
-	return GLogging.Tracef("%s %s,reason: %s ",this.Name,TaskFailed,reason)
+	return GLogger.Tracef("%s %s,reason: %s ",this.Name,TaskFailed,reason)
 }
 
 func (this* TaskConfiguration) Trace(data interface{})(error){
-	return GLogging.Tracef("%s %s",this.Name,Trace)
+	return GLogger.Tracef("%s %s",this.Name,Trace)
 }
 
 func (this* TaskConfiguration) RowsAffected(rowsAffected uint64)(error){
-	return GLogging.Tracef(fmt.Sprintf("%s %s:%d",this.Name,RowsAffected,rowsAffected))
+	return GLogger.Tracef("%s %s:%d",this.Name,RowsAffected,rowsAffected)
 }
 
 func (this* TaskConfiguration) TotalRowsAffected(rowsAffected uint64)(error){
-	return GLogging.Tracef(fmt.Sprintf("%s %s:%d",this.Name,TotalRowsAffected,rowsAffected))
+	return GLogger.Tracef("%s %s:%d",this.Name,TotalRowsAffected,rowsAffected)
 }
 
 //does some housekeeping int he task configuration, shoudl be called after configuration is loaded

@@ -19,7 +19,7 @@ const(
 	StartJob			=	"StartJob"
 	StopJob				=	"StopJob"
 	SessionSuccess		=	"SessionSuccess"
-	SessionFailed 		=	"SessionFail"
+	SessionFailed 		=	"SessionFailed"
 	RowsAffected		=	"RowsAffected"
 	TotalRowsAffected	=	"TotalRowsAffected"
 	TaskFailed			=	"TaskFailed"
@@ -82,11 +82,14 @@ func (this*LoggingModule) Tracef(format string, args... interface{})(err error){
 		err=this.handleLogError(recover())
 	}()
 	//output whatever it is
-	s:=format
+	var s string
+	format="%s "+format+"\n"
 	//if there are some arguments then format
 	if len(args)!=0{
 		args=PrependArrayOfInterfaces(args,[]interface{}{time.Now().Format(time.StampMilli)})
-		s=fmt.Sprintf("%s "+format+"\n",args...)
+		s=fmt.Sprintf(format,args...)
+	}else{
+		s=fmt.Sprintf(format, time.Now().Format(time.StampMilli))
 	}
 
 	if _, err := this.File.WriteString(s); err != nil {

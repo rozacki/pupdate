@@ -4,7 +4,6 @@ import(
 	"fmt"
 	"time"
 	_ "github.com/go-sql-driver/mysql"
-	"database/sql"
 	"strings"
 	_"os"
 )
@@ -38,7 +37,7 @@ func makeSessionController(configuration SessionConfiguration)(session* SessionC
 	//generate session name
 	sessionController:=SessionController{Configuration:configuration}
 	//open logging file explicitly
-	if err:= GLogging.OpenLog();err!=nil{
+	if err:= GLogger.OpenLog();err!=nil{
 		return nil,err
 	}
 
@@ -46,7 +45,22 @@ func makeSessionController(configuration SessionConfiguration)(session* SessionC
 }
 
 //Runs job in order
-func (this *SessionController) StartTasks() {
+func (this *SessionController) StartTasks() (err error){
+	defer func(){
+		if recVal:=recover();recVal!=nil{
+			switch v:=recVal.(type){
+				case error: err=v
+				case string: err=StringError(v)
+				default: err=StringError("unknown error")
+			}
+			this.Configuration.SessionFailed(err.Error())
+			GLogger.CloseLog(false)
+		}else{
+			this.Configuration.SessionSuccess()
+			GLogger.CloseLog(true)
+		}
+	}()
+
 	for _,task:=range this.Configuration.Tasks{
 		//if task is disabled then we skip it
 		if task.Disabled{
@@ -61,20 +75,19 @@ func (this *SessionController) StartTasks() {
 
 		//on first task failed terminates session
 		if taskData.Failed{
-			this.Configuration.SessionFailed(fmt.Sprintf("'%s'. Task details %+v",taskData.LastDroppedJob.LastErrorMsg,taskData))
-			return
+			panic(StringError(fmt.Sprintf("'%s'. Task details %+v",taskData.LastDroppedJob.LastErrorMsg,taskData)))
 		}
 
 		//should I finish
 		select{
 		//this channel is used as global flag to finish processing. it is used by main thread and allow user to signal termination
 		case <-GDone:
-			fmt.Printf("session terminated\n")
-			return
+			//todo: if there is at least one more task set status as terminated
+			panic("session terminated")
 		case  <-time.After(1* time.Millisecond):
 		}
 	}
-	this.Configuration.SessionSuccess()
+	return nil
 }
 //runs single task by spawning jobs
 //todo: cancellation via done channel
@@ -98,11 +111,11 @@ func (this *SessionController) startTask(configuration TaskConfiguration) TaskDa
 	var jobDataChannel		=	make(chan *JobData, configuration.Concurrency)
 	//
 	defer func(){
+		configuration.RowsAffected(taskData.RowsAffected)
 		if taskData.Failed {
 			//record that fact
 			configuration.EventFailTask(taskData.LastDroppedJob.LastErrorMsg)
 		}else{
-			configuration.RowsAffected(taskData.RowsAffected)
 			configuration.EventSuccessTask()
 		}
 		//last serialisation
@@ -220,80 +233,6 @@ func (this *SessionController) startTask(configuration TaskConfiguration) TaskDa
 		}
 	}
 }
-
-///Atomic SQL exec.
-//tested on MySQL update
-//todo:handle errors-
-//todo:implement query
-//todo: implement queryrow - that returns at most one row
-//Exec executes a query without returning any rows
-func (this *SessionController) Exec(jobContext JobExecutionContext) {
-	//how many rows were affected by Exec() (if supported by SQL driver)
-	//var totalRowsAffected uint64
-
-	//log some debuf info if in debug mode
-	this.Debugf(jobContext.Debug,FormatStruct,jobContext)
-	this.Debugf(jobContext.Debug,FormatStruct,jobContext.JobData)
-
-	//store start time- for reporting purposes
-	jobContext.JobData.StartTime = time.Now()
-
-	//all deffered functions
-	defer func() {
-		if err := recover(); err != nil {
-			this.Debugf(jobContext.Debug,"panic %s\n",err)
-			jobContext.JobData.Error 		= 	true
-			jobContext.JobData.LastErrorMsg	=	fmt.Sprintf("%s",err)
-		}
-		//increase number of attmpts
-		jobContext.JobData.Attempts++
-		//record data
-		jobContext.JobData.StopTime = time.Now()
-		//notify producer that another job has finished
-		jobContext.JobDataChannel <- jobContext.JobData
-		//
-		this.Debugf(jobContext.Debug,FormatStruct,jobContext)
-		this.Debugf(jobContext.Debug,FormatStruct,jobContext.JobData)
-	}()
-
-	//how to use connection pool?
-	db, err := sql.Open("mysql", jobContext.Dsn)
-	if err != nil {
-		this.Debugf(jobContext.Debug,FormatStruct,err)
-		panic(err)
-	}
-	//close connection hence no side effects
-	defer db.Close()
-	//log.Print("connection open ", Dsn)
-
-	//iterate all 'set'
-	for _,stmt:=range jobContext.PreSteps {
-		_, err := db.Exec(stmt)
-		if err != nil {
-			this.Debugf(jobContext.Debug,FormatStruct,err)
-			panic(err)
-		}
-		this.Debugf(jobContext.Debug,"pre-exec: %s",stmt)
-	}
-
-	var result sql.Result
-	//all data source details should be well encapsulated
-	result, err = db.Exec(jobContext.JobData.Query)
-
-	if err != nil {
-		this.Debugf(jobContext.Debug,FormatStruct,err)
-		panic(err)
-	}
-	//if driver supports rows affected and last inserted id
-	if rowsAffected,err:=result.RowsAffected();err==nil{
-		jobContext.JobData.RowsAffected=uint64(rowsAffected)
-	}
-
-	this.Debugf(jobContext.Debug,"exec query %s \n",jobContext.JobData.Query)
-	this.Debugf(jobContext.Debug,"rows affected: %d\n",jobContext.JobData.RowsAffected)
-}
-
-
 func (this *SessionController)Debugf(enabled bool,format string, args... interface{}){
 	if enabled {
 		GDLogger.Debugf(format,args)

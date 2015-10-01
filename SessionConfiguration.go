@@ -10,7 +10,9 @@ type SessionConfiguration struct{
 	//
 	TaskCounter	uint64
 	//interface to session execution context
-	ExecutionContext SessionExecutionContext
+	executionContext SessionExecutionContext
+	//
+	Test interface{}
 }
 
 func (this*SessionConfiguration) Init()error{
@@ -23,13 +25,13 @@ func (this*SessionConfiguration) Init()error{
 }
 //
 func (this *SessionConfiguration) SessionSuccess()(error){
-	return GLogging.Tracef("",SessionSuccess)
+	return GLogger.Tracef(SessionSuccess)
 
 }
 func (this *SessionConfiguration) SessionFailed(reason string)(error){
-	return GLogging.Tracef("%s, reason:%s",SessionFailed,reason)
+	return GLogger.Tracef("%s, reason:%s",SessionFailed,reason)
 }
 
 func (this *SessionConfiguration) TaskDisabled(taskName string)(error){
-	return GLogging.Tracef(taskName,TaskDisabled)
+	return GLogger.Tracef("%s %s", taskName,TaskDisabled)
 }

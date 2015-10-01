@@ -9,8 +9,8 @@
     "Version-this is software version": "v0.1",
     "Name": "select testresult",
     "Description":"basic select: no partition",
-    "SessionParam": "",
-    "Dsn": "moth:pass@tcp(localhost:3306)/moth",
+    "PreSteps":[],
+    "Dsn": "root:root@tcp(192.168.99.100:32767)/MOTH3",
     "Exec": "select count(*) from testresult",
     "MaxAttempts": 3,
     "Debug":true

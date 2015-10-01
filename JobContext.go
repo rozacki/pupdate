@@ -17,15 +17,15 @@ type JobExecutionContext struct{
 
 //TaskConfiguration extands existing MonitoringModule
 func (this* JobExecutionContext) EventStartJob()(error){
-	return GLogging.Tracef(this.TaskName,StartJob)
+	return GLogger.Tracef(this.TaskName,StartJob)
 }
 
 func (this* JobExecutionContext) EventStopTJob()(error){
-	return GLogging.Tracef(this.TaskName,StopJob)
+	return GLogger.Tracef(this.TaskName,StopJob)
 }
 
 func (this* JobExecutionContext) Event(data interface{})(error){
-	return GLogging.Tracef(this.TaskName,Trace)
+	return GLogger.Tracef(this.TaskName,Trace)
 }
 
 //for debugging purposes, does not return error
