@@ -26,8 +26,8 @@
 -when there is an error then show all conext if not show only sid,tid name, start time, stop time, number of rows affected
 
 #delta
-if moth is dropped then etl could transfer all data back if data is partitioned but the second phase will be
-redundand then because there is no way to find out if mot2.entity was juest added rfr and advice will need additional 2 tasks
+if destination database is dropped then etl could transfer all data back if data is partitioned but the second phase will be
+redundand then because there is no way to find out if entity was juest added rfr and advice will need additional 2 tasks
 
 Deplyment
 Deplpoy app with monitoring/seed_date.dat
