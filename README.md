@@ -1,20 +1,29 @@
 #pupdate
--support "set" after processing- Tab
--measure performance of single job
+
+-constant measure performance of single job
 -shutdown after last job finished
--support for signaling
--etlsuccessfull  is server time
+-support for linux signaling
+-etl successfull  is server time
 -how to reset/reconnect mysql connection?
--load config only flag
--PreSet error max attempt- currently we don't differentiate
--PostStep error max attempt - currently we don't diffirentatie
+
+-PreSet error max attempt- currently we don't differentiate what really caused error
+-PostStep error max attempt - currently we don't diffirentatie what really caused error
 -Recovery steps (try, catch or deffer, recover)
 -change flags -config to -c,-test_confg to -tc etc
--from command line output whole configuration with comments
--measure performance of single job and report
--parametrize task storage type: mysql, mongodb, elastic elastic
--parametrize task method: update, select elastic
+-from command line output whole configuration with comments attached
+-parametrize task method: exec, query, querysingle
+
+
 -parametrize task: add special value (string) to indicate that all rows should be processed instead of providing max(id)
+-SQL should be using SQL parameters
+-SessionController.startTask  defer should handle panic(TaskData) instead of using methods global TaskData..?
+-XYZConfiguration should be read-only interface that has accerss to SQL methods
+-LOAD FILES-parallel
+-Partition database
+-extend sql to hanlde files: use nfs
+-tableau interface
+-rest interface
+-sheel interface
 
 #tests
 -automated tests for all add and update scripts

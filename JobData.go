@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+
 //Defines single unit of job
 type JobData struct {
 	Name      string

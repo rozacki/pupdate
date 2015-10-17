@@ -5,15 +5,32 @@ import(
 	"strings"
 )
 
+const(
+	Exec		=	"EXEC"
+	QueryOne	=	"QueryOne"
+	Query		=	"Query"
+)
+
 type TaskConfiguration struct {
 	Name   string
 	Dsn    string
+	//single query no result
 	Exec   string
 	ExecTab[] string
+	//queryone - scalar result
+	//query	-vector result
+	//exec - no result is default
+	ExecType string
+	//single query, vector result
+	//for queryone and query we can store output into files or memory...
+	Output string
 	//if type string it may be sql query, if int then it is max value
-	Max 	uint64//interface{}
-	//if type string it may be sql query, if int then it is min value
-	Min         uint64//interface{}
+	MaxQuery	string
+	Max 	uint64
+
+	//If type string it may be sql query, if int then it is min value
+	MinQuery	string
+	Min         uint64
 	//
 	Step        uint64
 	Concurrency uint64
@@ -30,6 +47,7 @@ type TaskConfiguration struct {
 	//Allows to debug individual tasks. This flag is inherited by JonContext.
 	Debug bool
 //**************** dynamic parameters
+// todo: should go to taskcontext
 	//current task Id
 	TaskId uint64
 }

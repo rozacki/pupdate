@@ -82,15 +82,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	switch GSessionConfiguration.Test.(type){
-		case string: GCLogger.Printf("type string")
-		case int: GCLogger.Printf("type int")
-		case float64: GCLogger.Printf("type float64")
-		default: GCLogger.Printf("unknown type")
-	}
-
-	os.Exit(1)
-
 	Printf("Configuration loaded. Found %d tasks", len(GSessionConfiguration.Tasks))
 
 	//set last, etl to global variable

@@ -11,8 +11,6 @@ type SessionConfiguration struct{
 	TaskCounter	uint64
 	//interface to session execution context
 	executionContext SessionExecutionContext
-	//
-	Test interface{}
 }
 
 func (this*SessionConfiguration) Init()error{
