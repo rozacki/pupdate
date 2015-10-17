@@ -70,8 +70,8 @@ func (this *SessionController) StartTasks() (err error){
 		//
 		this.Configuration.TaskCounter++
 
-		//synchronous task
-		taskData:=this.startTask(task)
+		//blocking, synchronous task
+		taskData:=this.executeTask(task)
 
 		//on first task failed terminates session
 		if taskData.Failed{
@@ -89,44 +89,59 @@ func (this *SessionController) StartTasks() (err error){
 	}
 	return nil
 }
-//runs single task by spawning jobs
-//todo: cancellation via done channel
+//runs single task by spawning multiple paraller jobs if necessary
 //todo: move to taskcontroller
-func (this *SessionController) startTask(configuration TaskConfiguration) TaskData {
-	configuration.EventStartTask()
+func (this *SessionController) executeTask(taskConfiguration TaskConfiguration) TaskData {
+
+	taskConfiguration.EventStartTask()
 
 	//create new task data structure where we hold op data and configuration
-	var taskData 			= 	TaskData{Id: this.Configuration.TaskCounter, DataCursor: configuration.Min, Status: "working", TaskConfiguration: configuration,CreationTime:time.Now()}
+	var taskData 			= 	TaskData{
+		Id					: this.Configuration.TaskCounter,
+		DataCursor			: taskConfiguration.Min,
+		Status				: "working",
+		TaskConfiguration	: taskConfiguration,
+		CreationTime		: time.Now()}
+
+	//before count jobscount I have to ask mysql for max and min values
+	if taskConfiguration.Max==0 && taskConfiguration.MaxQuery!=""{
+
+	}
+
+	if taskConfiguration.Min==taskConfiguration.Max && taskConfiguration.MinQuery!=""{
+
+	}
+
 	var JobsCount	uint64
-	if configuration.Step<=0 || configuration.Max<=configuration.Min || configuration.Concurrency<1{
-		JobsCount					=1
-		configuration.Step			=0
-		configuration.Max			=0
-		configuration.Min			=0
-		configuration.Concurrency	=1
+	if taskConfiguration.Step<=0 || taskConfiguration.Max<=taskConfiguration.Min || taskConfiguration.Concurrency<1{
+		JobsCount						=1
+		taskConfiguration.Step			=0
+		taskConfiguration.Max			=0
+		taskConfiguration.Min			=0
+		taskConfiguration.Concurrency	=1
 	}else {
-		JobsCount	= ((configuration.Max - configuration.Min)/configuration.Step)
+		JobsCount	= ((taskConfiguration.Max - taskConfiguration.Min)/taskConfiguration.Step)
 	}
 	//when job finished then posts its status here
-	var jobDataChannel		=	make(chan *JobData, configuration.Concurrency)
+	var jobDataChannel		=	make(chan *JobData, taskConfiguration.Concurrency)
 	//
 	defer func(){
-		configuration.RowsAffected(taskData.RowsAffected)
+		taskConfiguration.RowsAffected(taskData.RowsAffected)
 		if taskData.Failed {
 			//record that fact
-			configuration.EventFailTask(taskData.LastDroppedJob.LastErrorMsg)
+			taskConfiguration.EventFailTask(taskData.LastDroppedJob.LastErrorMsg)
 		}else{
-			configuration.EventSuccessTask()
+			taskConfiguration.EventSuccessTask()
 		}
 		//last serialisation
 		SerialiseStruct(this.Configuration)
 		//close task<-job comm channel
 		close(jobDataChannel)
 		//
-		this.Debugf(configuration.Debug, FormatStruct, configuration)
+		this.Debugf(taskConfiguration.Debug, FormatStruct, taskConfiguration)
 	}()
 
-	this.Debugf(configuration.Debug,FormatStruct,  configuration)
+	this.Debugf(taskConfiguration.Debug,FormatStruct, taskConfiguration)
 
 	for {
 		var jobData *JobData
@@ -135,12 +150,12 @@ func (this *SessionController) startTask(configuration TaskConfiguration) TaskDa
 			{
 				//check status, if it error then scheduled it again
 				if jobData.Error {
-					this.Debugf(configuration.Debug,FormatStruct,jobData)
+					this.Debugf(taskConfiguration.Debug,FormatStruct,jobData)
 					//increment errors counter
 					taskData.Errors++
 					//record last dropped
 					taskData.LastDroppedJob=*jobData
-					if jobData.Attempts == configuration.MaxAttempts {
+					if jobData.Attempts == taskConfiguration.MaxAttempts {
 						//record how many has been dropped- it will be only one
 						taskData.MaxAttemptJobsDropped++
 						//
@@ -175,14 +190,14 @@ func (this *SessionController) startTask(configuration TaskConfiguration) TaskDa
 		// or exhausted stream
 		// or finished
 		// then we cannot schedule more jobs
-		if (taskData.QueueLength < configuration.Concurrency	&&	((taskData.Success+taskData.MaxAttemptJobsDropped+taskData.QueueLength) < JobsCount)){
+		if (taskData.QueueLength < taskConfiguration.Concurrency	&&	((taskData.Success+taskData.MaxAttemptJobsDropped+taskData.QueueLength) < JobsCount)){
 
 			//if current job is empty then we create new job
 			if jobData == nil {
-				var Query string	=	configuration.Exec
+				var Query string	=	taskConfiguration.Exec
 				//if partitioning enabled then format SQL string to provide Min and Max
 				if JobsCount>1{
-					Query=fmt.Sprintf(configuration.Exec, taskData.DataCursor, taskData.DataCursor + taskData.TaskConfiguration.Step)
+					Query=fmt.Sprintf(taskConfiguration.Exec, taskData.DataCursor, taskData.DataCursor + taskData.TaskConfiguration.Step)
 				}
 				//try to resolve $LastEtl to date time
 				Query=strings.Replace(Query,LastEtlVariableName,LastEtl.Format(SessionFileFormat),-1)
@@ -191,22 +206,23 @@ func (this *SessionController) startTask(configuration TaskConfiguration) TaskDa
 				//store only data that is requred and specifc for job
 				jobData = &JobData{Id: taskData.JobId, Query: Query}
 				//move cursor to the next step
-				taskData.DataCursor += configuration.Step
+				taskData.DataCursor += taskConfiguration.Step
 				//
 				taskData.JobId++
 			}
 
-			jobContext:=	JobExecutionContext{
-				JobData:jobData,
-				Dsn:configuration.Dsn,
-				PreSteps:configuration.PreSteps,
-				JobDataChannel:jobDataChannel,
-				Debug:configuration.Debug,
-				TaskName:configuration.Name}
-			this.Debugf(configuration.Debug,FormatStruct,jobContext)
+			jobContext:=	&JobExecutionContext{
+				jobData:jobData,
+				jobDataChannel:jobDataChannel}
+			this.Debugf(taskConfiguration.Debug,FormatStruct,jobContext)
 			//schedule the job
 			//todo: switch case here: Exec, Query, QueryOne
-			go this.Exec(jobContext)
+			switch strings.ToUpper(taskConfiguration.ExecType){
+				case Exec:	go this.Exec(jobContext)
+				case Query: go this.QueryRow(jobContext)
+				case QueryOne:
+			}
+
 			//increase queue length
 			taskData.QueueLength++
 			//reset timeout
