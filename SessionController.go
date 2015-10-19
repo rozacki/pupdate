@@ -45,16 +45,16 @@ func makeSessionController(configuration SessionConfiguration)(session* SessionC
 }
 
 //Runs job in order
-func (this *SessionController) StartTasks() (err error){
+func (this *SessionController) StartSession() (err error){
 	defer func(){
 		if recVal:=recover();recVal!=nil{
-			switch v:=recVal.(type){
-				case error: err=v
-				case string: err=StringError(v)
-				default: err=StringError("unknown error")
-			}
-			this.Configuration.SessionFailed(err.Error())
-			GLogger.CloseLog(false)
+				switch v:=recVal.(type){
+					case error: err=v
+					case string: err=StringError(v)
+					default: err=StringError("unknown error")
+				}
+				this.Configuration.SessionFailed(err.Error())
+				GLogger.CloseLog(false)
 		}else{
 			this.Configuration.SessionSuccess()
 			GLogger.CloseLog(true)

@@ -52,24 +52,42 @@ var(
 )
 
 var (
-//last sucessfull etl
-//todo: change name to something more generic. move it to session context when available
+	//last sucessfull etl
+	//todo: change name to something more generic. move it to session context when available
 	LastEtl	time.Time
-	LastEtlFlag			=	flag.String("last_etl","","last etl date, not mandatory")
-//
+	LastEtlFlag			=	flag.String("last-etl","","last etl date, not mandatory")
+	//
 	EtlTo time.Time
-	EtlToFlag		= flag.String("etl_to","","etl data up to date, not mandatory")
-//
-	ConfigFileNameFlag	= flag.String("config", "", "configuration file name")
-//
-	TestConfigLoadFlag	= flag.Bool("test_config",false,"test configuration?")
+	EtlToFlag		= flag.String("etl-to","","etl data up to date, not mandatory")
+	//
+	ConfigFileNameFlag	= flag.String("config-file", "", "configuration file name")
+	//
+	TestConfigLoadFlag	= flag.Bool("test-config",false,"test configuration")
+	//Shows supported configuration calues and hierarchy
+	ShowConfig		=	flag.Bool("show-config", false, "Shows supported configuration values and hierarchy")
 )
 
 func main() {
+	defer func(){
+		if recovered:=recover();recovered!=nil{
+			switch v:=recovered.(type) {
+				case error:Printf(v.Error());
+				default:Printf("unknown error");
+			}
+			os.Exit(1)
+		}
+	}()
+
 	var err error
 
+	flag.Usage=usage
 	//parse parameters
 	flag.Parse()
+
+	if *ShowConfig{
+		fmt.Println(new(TaskConfiguration).GetHelpString(""))
+		os.Exit(1)
+	}
 
 	//if config file name is empty
 	if *ConfigFileNameFlag == "" {
@@ -122,7 +140,7 @@ func main() {
 	}
 
 	//this is where fun begins
-	sessionController.StartTasks()
+	sessionController.StartSession()
 	//by closing channel we terminate session
 	close(GDone)
 }
@@ -181,9 +199,9 @@ func Printf(format string,args... interface{}){
 }
 
 func usage(){
-	Printf("Data integration tool. Usage:\n")
-	Printf("pupdate -config=monitoring/configuration_file [-test_config]\n")
-	Printf("-config path to configiration file name\n")
-	Printf("-test_config whether to test configuration\n")
+	fmt.Println("Data integration tool. Usage:")
+	flag.PrintDefaults()
+	Printf("Supported parameters:\n")
+	Printf(new(TaskConfiguration).GetHelpString(""))
 	os.Exit(1)
 }
